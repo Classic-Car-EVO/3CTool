@@ -31,7 +31,7 @@ internal struct ClosestPointArgs
 internal static class MeshQueryKernels
 {
     // Three fixed, non-axis-aligned directions for parity voting (edge/vertex hits on all three are unlikely).
-    private static Float3 ParityDirection(int k) => k switch
+    internal static Float3 ParityDirection(int k) => k switch
     {
         0 => Float3.Normalize(new Float3(0.5773f, 0.5791f, 0.5755f)),
         1 => Float3.Normalize(new Float3(-0.6211f, 0.3122f, 0.7187f)),
@@ -146,7 +146,7 @@ internal static class MeshQueryKernels
         args.Triangles[index] = bestTriangle;
     }
 
-    private static int CountCrossings(MeshView mesh, Float3 origin, Float3 direction)
+    internal static int CountCrossings(MeshView mesh, Float3 origin, Float3 direction)
     {
         var crossings = 0;
         var count = mesh.NodeCount;
