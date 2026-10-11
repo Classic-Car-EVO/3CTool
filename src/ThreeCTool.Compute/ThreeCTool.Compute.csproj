@@ -6,6 +6,14 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ThreeCTool.Core\ThreeCTool.Core.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Geometry\ThreeCTool.Geometry.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ThreeCTool.Compute.Tests" />
+    <InternalsVisibleTo Include="ThreeCTool.Gpu.Tests" />
+    <!-- ILGPU's CPU backend emits a dynamic assembly that must see the internal kernel types. -->
+    <InternalsVisibleTo Include="ILGPURuntime" />
   </ItemGroup>
 
   <PropertyGroup>

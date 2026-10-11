@@ -1,6 +1,7 @@
 using System.Numerics;
 
 using ThreeCTool.Core.Projects;
+using ThreeCTool.TestSupport;
 
 using Xunit;
 
@@ -139,17 +140,5 @@ public sealed class RealModelTests
         Assert.True(mesh.FaceNormal(hit.Triangle).Z > 0);
     }
 
-    private static string? ModelPath(string fileName)
-    {
-        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
-        {
-            if (File.Exists(Path.Combine(dir.FullName, "ThreeCTool.slnx")))
-            {
-                var path = Path.Combine(dir.FullName, "testModels", fileName);
-                return File.Exists(path) ? path : null;
-            }
-        }
-
-        return null;
-    }
+    private static string? ModelPath(string fileName) => TestModels.Find(fileName);
 }

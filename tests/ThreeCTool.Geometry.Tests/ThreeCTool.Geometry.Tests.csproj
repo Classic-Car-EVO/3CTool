@@ -4,6 +4,11 @@
     <ProjectReference Include="..\..\src\ThreeCTool.Geometry\ThreeCTool.Geometry.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <Using Include="ThreeCTool.TestSupport" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
