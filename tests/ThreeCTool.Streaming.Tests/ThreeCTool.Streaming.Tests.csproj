@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ThreeCTool.Streaming\ThreeCTool.Streaming.csproj" />
+    <ProjectReference Include="..\ThreeCTool.FluidNcSimulator\ThreeCTool.FluidNcSimulator.csproj" />
   </ItemGroup>
 
   <PropertyGroup>
