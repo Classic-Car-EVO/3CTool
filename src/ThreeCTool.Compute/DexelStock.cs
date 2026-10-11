@@ -171,6 +171,8 @@ public sealed class DexelStock : IDisposable
     /// <summary>Test hook: route every ray through the general solver.</summary>
     internal bool ForceGeneralSolver { get; set; }
 
+    internal DexelGridView GridView(DexelAxis axis) => _grids[(int)axis].View;
+
     public static DexelStock Empty(ComputeContext compute, BoundingBox bounds, float resolution, int capacity = DefaultCapacity) =>
         new(compute, bounds, resolution, capacity);
 
