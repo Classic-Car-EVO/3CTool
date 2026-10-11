@@ -9,7 +9,7 @@
     <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     <Deterministic>true</Deterministic>
     <Product>3C Tool</Product>
-    <Company>schilpr-TT</Company>
-    <Copyright>Copyright (c) 2026 schilpr-TT</Copyright>
+    <Company>TenTwenty Media BV</Company>
+    <Copyright>Copyright (c) 2026 TenTwenty Media BV</Copyright>
   </PropertyGroup>
 </Project>
