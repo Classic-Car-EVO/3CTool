@@ -498,6 +498,9 @@ Technical spikes (first):
 5. Hardware: external B driver on PiBot expansion step/dir outputs, FluidNC B-axis config, max step rate with 7 motors, motor quick-disconnect at the kinematic mount.
 6. Klipper `kinematics: none` + Moonraker on the Pi 4 next to the feeder UI; BTT toolhead board over USB-C; thermal-runaway behavior.
 7. FluidNC printing behavior: `G93` with B, `M67` PWM synchronization, B-value growth vs. float precision and `G92 B0` behavior (planner sync).
+
+Progress:
+- 2026-10-11 Core + Data + Geometry: domain model (all entities in section 4); EF Core SQLite library + project DBs with migrations, versioned built-in library (default machine, ER20 collets, 14 materials, 10 filaments, 3 print profiles), project snapshots + library diff; Geometry: STL (binary/ASCII, multi-solid), 3MF (components, production-extension parts, units), welding, normals, transforms, A-axis kinematics, mesh repair, BVH, XY grid, stock/rotary placement, orientation suggestions. Not here: DXF/SVG (Cutting stage), dexel volume operations (Simulation stage).
 8. Nozzle probing on the conductive tool setter (electrical ground path to the nozzle/heater block).
 
 ---

@@ -3,6 +3,9 @@
 ##
 ## Get latest from `dotnet new gitignore`
 
+# Local real-world test models (not redistributable; RealModelTests skip when absent)
+testModels/
+
 # dotenv files
 .env
 
