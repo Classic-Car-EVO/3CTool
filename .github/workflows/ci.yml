@@ -1,0 +1,35 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet restore ThreeCTool.slnx
+      - run: dotnet build ThreeCTool.slnx --no-restore -c Release
+      # Hosted runners have no usable GPU; GPU tests run in gpu.yml on the self-hosted runner.
+      - run: dotnet test ThreeCTool.slnx --no-build -c Release --filter "Category!=Gpu"
+
+  feeder-linux-arm64:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+      - run: dotnet publish src/ThreeCTool.Feeder/ThreeCTool.Feeder.csproj -c Release -r linux-arm64 --self-contained -o out/feeder

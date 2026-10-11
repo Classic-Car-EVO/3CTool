@@ -1,0 +1,37 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ThreeCTool.Additive/ThreeCTool.Additive.csproj" />
+    <Project Path="src/ThreeCTool.Compute/ThreeCTool.Compute.csproj" />
+    <Project Path="src/ThreeCTool.Core/ThreeCTool.Core.csproj" />
+    <Project Path="src/ThreeCTool.Cutting/ThreeCTool.Cutting.csproj" />
+    <Project Path="src/ThreeCTool.Data/ThreeCTool.Data.csproj" />
+    <Project Path="src/ThreeCTool.Desktop/ThreeCTool.Desktop.csproj" />
+    <Project Path="src/ThreeCTool.Feeder.Contracts/ThreeCTool.Feeder.Contracts.csproj" />
+    <Project Path="src/ThreeCTool.Feeder/ThreeCTool.Feeder.csproj" />
+    <Project Path="src/ThreeCTool.Feeds/ThreeCTool.Feeds.csproj" />
+    <Project Path="src/ThreeCTool.Geometry/ThreeCTool.Geometry.csproj" />
+    <Project Path="src/ThreeCTool.Post/ThreeCTool.Post.csproj" />
+    <Project Path="src/ThreeCTool.Rendering/ThreeCTool.Rendering.csproj" />
+    <Project Path="src/ThreeCTool.Simulation/ThreeCTool.Simulation.csproj" />
+    <Project Path="src/ThreeCTool.Streaming/ThreeCTool.Streaming.csproj" />
+    <Project Path="src/ThreeCTool.Thermal/ThreeCTool.Thermal.csproj" />
+    <Project Path="src/ThreeCTool.Toolpaths/ThreeCTool.Toolpaths.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/ThreeCTool.Additive.Tests/ThreeCTool.Additive.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Compute.Tests/ThreeCTool.Compute.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Core.Tests/ThreeCTool.Core.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Cutting.Tests/ThreeCTool.Cutting.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Data.Tests/ThreeCTool.Data.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Feeds.Tests/ThreeCTool.Feeds.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.FluidNcSimulator/ThreeCTool.FluidNcSimulator.csproj" />
+    <Project Path="tests/ThreeCTool.Geometry.Tests/ThreeCTool.Geometry.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Gpu.Tests/ThreeCTool.Gpu.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.MoonrakerMock/ThreeCTool.MoonrakerMock.csproj" />
+    <Project Path="tests/ThreeCTool.Post.Tests/ThreeCTool.Post.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Simulation.Tests/ThreeCTool.Simulation.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Streaming.Tests/ThreeCTool.Streaming.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Thermal.Tests/ThreeCTool.Thermal.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Toolpaths.Tests/ThreeCTool.Toolpaths.Tests.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,16 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThreeCTool.Core\ThreeCTool.Core.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Geometry\ThreeCTool.Geometry.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Compute\ThreeCTool.Compute.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Simulation\ThreeCTool.Simulation.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+</Project>
