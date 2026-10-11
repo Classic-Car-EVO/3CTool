@@ -490,9 +490,11 @@ flowchart TD
 
 Technical spikes (first):
 1. ILGPU OpenCL backend on Radeon 8060S with ROCm OpenCL on Linux; ILGPU CUDA on RTX 2080.
+   - Status 2026-10-11: OpenCL on Radeon 8060S (gfx1151) passed (ILGPU 1.5.3, .NET 10, `ThreeCTool.Gpu.Tests`). CUDA on RTX 2080 pending.
 2. FluidNC protocol verification (latest stable): planner/RX buffer reporting, line-number reporting, `G93` support, persistence of `G54` offsets, behavior of soft reset vs. e-stop, telnet vs. serial differences, `$Config/Dump` / `$Build/Info` output for profile import and version check.
 3. Avalonia DRM/KMS + OpenGL ES on Raspberry Pi 4 with 7" touchscreen.
 4. Avalonia `OpenGlControlBase` + Silk.NET on desktop (AMD Mesa + NVIDIA driver).
+   - Status 2026-10-11: AMD Mesa (radeonsi) passed with desktop GL 4.6 core and with OpenGL ES 3.0 via EGL (`ThreeCTool.Desktop --gles`, same shaders as the Pi). NVIDIA pending.
 5. Hardware: external B driver on PiBot expansion step/dir outputs, FluidNC B-axis config, max step rate with 7 motors, motor quick-disconnect at the kinematic mount.
 6. Klipper `kinematics: none` + Moonraker on the Pi 4 next to the feeder UI; BTT toolhead board over USB-C; thermal-runaway behavior.
 7. FluidNC printing behavior: `G93` with B, `M67` PWM synchronization, B-value growth vs. float precision and `G92 B0` behavior (planner sync).
