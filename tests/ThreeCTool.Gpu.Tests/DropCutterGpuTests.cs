@@ -86,6 +86,60 @@ public class DropCutterGpuTests(GpuAndCpuFixture fixture, ITestOutputHelper outp
         AssertClose(coarseCpu, coarseGpu, 2e-3f);
     }
 
+    [Fact]
+    public void PushCutterGpuMatchesCpu()
+    {
+        var surface = TestMeshes.Heightfield(new Vector2(0, 0), new Vector2(60, 60), 60, (x, y) => (4 * MathF.Sin(x / 6) * MathF.Cos(y / 9)) + (0.3f * y));
+        using var gpuMesh = new GpuMesh(fixture.Gpu, surface);
+        using var cpuMesh = new GpuMesh(fixture.Cpu, surface);
+        foreach (var cutter in Cutters)
+        {
+            foreach (var z in new[] { 0f, 5f, 12f })
+            {
+                var gpu = PushCutter.Grid(gpuMesh, cutter, z, new Vector2(-5, -5), new Vector2(65, 65), 0.7f);
+                var cpu = PushCutter.Grid(cpuMesh, cutter, z, new Vector2(-5, -5), new Vector2(65, 65), 0.7f);
+                AssertSameIntervals(cpu.XIntervals, gpu.XIntervals);
+                AssertSameIntervals(cpu.YIntervals, gpu.YIntervals);
+            }
+        }
+    }
+
+    [Fact]
+    public void CarBodyWaterlineIsFast()
+    {
+        if (TestModels.Find("CarBody.stl") is not { } path)
+        {
+            return;
+        }
+
+        var mesh = MeshImporter.Load(path).Bodies[0].Mesh;
+        using var gpuMesh = new GpuMesh(fixture.Gpu, mesh);
+        var bounds = mesh.Bounds;
+        var min = new Vector2(bounds.Min.X - 5, bounds.Min.Y - 5);
+        var max = new Vector2(bounds.Max.X + 5, bounds.Max.Y + 5);
+        _ = PushCutter.Grid(gpuMesh, CutterProfile.Ball(6), bounds.Center.Z, min, max, 50);
+
+        var watch = Stopwatch.StartNew();
+        var result = PushCutter.Grid(gpuMesh, CutterProfile.Ball(6), bounds.Center.Z, min, max, 0.1f);
+        watch.Stop();
+        output.WriteLine($"{fixture.Gpu.Device.Name}: {result.XFibers.Length + result.YFibers.Length} fibers on {mesh.TriangleCount} triangles in {watch.ElapsedMilliseconds} ms");
+        Assert.Contains(result.XIntervals, list => list.Length > 0);
+    }
+
+    private static void AssertSameIntervals(FiberInterval[][] expected, FiberInterval[][] actual)
+    {
+        Assert.Equal(expected.Length, actual.Length);
+        for (var i = 0; i < expected.Length; i++)
+        {
+            Assert.True(expected[i].Length == actual[i].Length, $"fiber {i}: {expected[i].Length} vs {actual[i].Length} intervals");
+            for (var k = 0; k < expected[i].Length; k++)
+            {
+                Assert.True(MathF.Abs(expected[i][k].Enter - actual[i][k].Enter) < 2e-3f, $"fiber {i}: {expected[i][k]} vs {actual[i][k]}");
+                Assert.True(MathF.Abs(expected[i][k].Exit - actual[i][k].Exit) < 2e-3f, $"fiber {i}: {expected[i][k]} vs {actual[i][k]}");
+            }
+        }
+    }
+
     private static void AssertClose(float[] expected, float[] actual, float tolerance)
     {
         Assert.Equal(expected.Length, actual.Length);
