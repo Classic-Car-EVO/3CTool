@@ -21,6 +21,10 @@ internal static class DeviceMath
 
     /// <summary>Maximum of a unimodal (e.g. concave) function on [a, b], endpoints included.</summary>
     public static float GoldenMax<TF>(TF f, float a, float b, out float arg)
+        where TF : struct, IScalarFunction =>
+        GoldenMax(f, a, b, GoldenIterations, out arg);
+
+    public static float GoldenMax<TF>(TF f, float a, float b, int iterations, out float arg)
         where TF : struct, IScalarFunction
     {
         var fa = f.Evaluate(a);
@@ -37,7 +41,7 @@ internal static class DeviceMath
         var x2 = a + (InvPhi * (b - a));
         var f1 = f.Evaluate(x1);
         var f2 = f.Evaluate(x2);
-        for (var i = 0; i < GoldenIterations; i++)
+        for (var i = 0; i < iterations; i++)
         {
             if (f1 < f2)
             {
@@ -74,10 +78,14 @@ internal static class DeviceMath
 
     /// <summary>Point in [a, b] where f crosses zero, given f(a) and f(b) of opposite sign (or zero).</summary>
     public static float Bisect<TF>(TF f, float a, float b)
+        where TF : struct, IScalarFunction =>
+        Bisect(f, a, b, BisectIterations);
+
+    public static float Bisect<TF>(TF f, float a, float b, int iterations)
         where TF : struct, IScalarFunction
     {
         var positiveAtA = f.Evaluate(a) >= 0;
-        for (var i = 0; i < BisectIterations; i++)
+        for (var i = 0; i < iterations; i++)
         {
             var m = 0.5f * (a + b);
             if ((f.Evaluate(m) >= 0) == positiveAtA)

@@ -68,7 +68,7 @@ internal static class PushCutterKernel
                             exit = MathF.Min(exit, length);
                             if (enter <= exit)
                             {
-                                count = Insert(list, count, enter, exit, ref overflow);
+                                count = IntervalList.Insert(list, count, Capacity, enter, exit, ref overflow);
                             }
                         }
                     }
@@ -116,64 +116,6 @@ internal static class PushCutterKernel
         }
 
         return covered;
-    }
-
-    /// <summary>Inserts [a, b] into the sorted disjoint list, merging overlaps. On overflow the gap to a neighbour is closed (conservative).</summary>
-    private static int Insert(ArrayView<float> list, int count, float a, float b, ref bool overflow)
-    {
-        // Find the first interval ending at or after a.
-        var first = 0;
-        while (first < count && list[(2 * first) + 1] < a)
-        {
-            first++;
-        }
-
-        // Absorb all intervals starting at or before b.
-        var last = first;
-        while (last < count && list[2 * last] <= b)
-        {
-            a = MathF.Min(a, list[2 * last]);
-            b = MathF.Max(b, list[(2 * last) + 1]);
-            last++;
-        }
-
-        var removed = last - first;
-        if (removed == 0 && count == Capacity)
-        {
-            overflow = true;
-            if (first > 0)
-            {
-                // Merge into the previous interval (conservative: blocks the gap).
-                list[(2 * (first - 1)) + 1] = MathF.Max(list[(2 * (first - 1)) + 1], b);
-                return count;
-            }
-
-            list[0] = a;
-            return count;
-        }
-
-        // Shift the tail so exactly one slot replaces [first, last).
-        var shift = 1 - removed;
-        if (shift > 0)
-        {
-            for (var k = count - 1; k >= last; k--)
-            {
-                list[2 * (k + shift)] = list[2 * k];
-                list[(2 * (k + shift)) + 1] = list[(2 * k) + 1];
-            }
-        }
-        else if (shift < 0)
-        {
-            for (var k = last; k < count; k++)
-            {
-                list[2 * (k + shift)] = list[2 * k];
-                list[(2 * (k + shift)) + 1] = list[(2 * k) + 1];
-            }
-        }
-
-        list[2 * first] = a;
-        list[(2 * first) + 1] = b;
-        return count + shift;
     }
 
     /// <summary>Blocked t-interval of one triangle for the fiber start + t·d at height start.Z.</summary>
