@@ -4,6 +4,12 @@
     <ProjectReference Include="..\..\src\ThreeCTool.Compute\ThreeCTool.Compute.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Compile Include="..\Shared\*.cs" Link="Shared\%(Filename)%(Extension)" />
+    <Compile Include="..\Shared\Compute\*.cs" Link="Shared\Compute\%(Filename)%(Extension)" />
+    <Using Include="ThreeCTool.TestSupport" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>

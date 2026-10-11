@@ -1,7 +1,10 @@
 using System.Numerics;
 
-namespace ThreeCTool.Geometry.Tests;
+using ThreeCTool.Geometry;
 
+namespace ThreeCTool.TestSupport;
+
+/// <summary>Procedural meshes shared by the test projects (linked via Compile Include).</summary>
 internal static class TestMeshes
 {
     /// <summary>Closed box with outward counter-clockwise triangles. Vertex i = x + 2y + 4z bits.</summary>
@@ -65,4 +68,49 @@ internal static class TestMeshes
     public static Mesh Mushroom() => Mesh.Merge(
         [Box(new Vector3(-5, -5, 0), new Vector3(5, 5, 30)), Box(new Vector3(-30, -30, 30), new Vector3(30, 30, 40))],
         "mushroom");
+
+    /// <summary>Heightfield surface z = f(x, y) over [min, max] as an open triangle grid.</summary>
+    public static Mesh Heightfield(Vector2 min, Vector2 max, int cells, Func<float, float, float> height)
+    {
+        var vertices = new Vector3[(cells + 1) * (cells + 1)];
+        for (var j = 0; j <= cells; j++)
+        {
+            for (var i = 0; i <= cells; i++)
+            {
+                var x = min.X + ((max.X - min.X) * i / cells);
+                var y = min.Y + ((max.Y - min.Y) * j / cells);
+                vertices[(j * (cells + 1)) + i] = new Vector3(x, y, height(x, y));
+            }
+        }
+
+        var indices = new List<int>();
+        for (var j = 0; j < cells; j++)
+        {
+            for (var i = 0; i < cells; i++)
+            {
+                var a = (j * (cells + 1)) + i;
+                indices.AddRange([a, a + 1, a + cells + 2, a, a + cells + 2, a + cells + 1]);
+            }
+        }
+
+        return new Mesh(vertices, [.. indices], "heightfield");
+    }
+}
+
+/// <summary>Locates the optional, never-committed real models in <c>testModels/</c> at the repository root.</summary>
+internal static class TestModels
+{
+    public static string? Find(string fileName)
+    {
+        for (var dir = new DirectoryInfo(AppContext.BaseDirectory); dir is not null; dir = dir.Parent)
+        {
+            if (File.Exists(Path.Combine(dir.FullName, "ThreeCTool.slnx")))
+            {
+                var path = Path.Combine(dir.FullName, "testModels", fileName);
+                return File.Exists(path) ? path : null;
+            }
+        }
+
+        return null;
+    }
 }
