@@ -4,6 +4,10 @@
     <ProjectReference Include="..\ThreeCTool.Core\ThreeCTool.Core.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <PackageReference Include="Clipper2" />
+  </ItemGroup>
+
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
     <ImplicitUsings>enable</ImplicitUsings>
