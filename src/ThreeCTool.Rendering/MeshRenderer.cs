@@ -1,5 +1,4 @@
 using System.Numerics;
-using System.Runtime.InteropServices;
 using Silk.NET.OpenGL;
 
 namespace ThreeCTool.Rendering;
@@ -49,8 +48,7 @@ public sealed class MeshRenderer : IDisposable
     public MeshRenderer(GL gl, bool isGles)
     {
         _gl = gl;
-        var header = isGles ? "#version 300 es\nprecision highp float;\n" : "#version 330 core\n";
-        _program = LinkProgram(header + VertexBody, header + FragmentBody);
+        _program = GlProgram.Link(gl, isGles, VertexBody, FragmentBody);
         _modelLocation = gl.GetUniformLocation(_program, "u_model");
         _viewProjectionLocation = gl.GetUniformLocation(_program, "u_viewProjection");
         _colorLocation = gl.GetUniformLocation(_program, "u_color");
@@ -94,10 +92,9 @@ public sealed class MeshRenderer : IDisposable
             return;
         }
 
-        // System.Numerics row-major (v * M) uploaded untransposed equals GLSL column-major (M * v).
         _gl.UseProgram(_program);
-        _gl.UniformMatrix4(_modelLocation, 1, false, AsFloats(in model));
-        _gl.UniformMatrix4(_viewProjectionLocation, 1, false, AsFloats(in viewProjection));
+        _gl.UniformMatrix4(_modelLocation, 1, false, GlProgram.AsFloats(in model));
+        _gl.UniformMatrix4(_viewProjectionLocation, 1, false, GlProgram.AsFloats(in viewProjection));
         _gl.Uniform3(_colorLocation, Color.X, Color.Y, Color.Z);
         var light = Vector3.Normalize(LightDirection);
         _gl.Uniform3(_lightDirectionLocation, light.X, light.Y, light.Z);
@@ -116,45 +113,5 @@ public sealed class MeshRenderer : IDisposable
         _gl.DeleteBuffer(_vbo);
         _gl.DeleteVertexArray(_vao);
         _gl.DeleteProgram(_program);
-    }
-
-    private static ReadOnlySpan<float> AsFloats(in Matrix4x4 m) =>
-        MemoryMarshal.Cast<Matrix4x4, float>(new ReadOnlySpan<Matrix4x4>(in m));
-
-    private uint LinkProgram(string vertexSource, string fragmentSource)
-    {
-        var vertex = CompileShader(ShaderType.VertexShader, vertexSource);
-        var fragment = CompileShader(ShaderType.FragmentShader, fragmentSource);
-        var program = _gl.CreateProgram();
-        _gl.AttachShader(program, vertex);
-        _gl.AttachShader(program, fragment);
-        _gl.LinkProgram(program);
-        _gl.DeleteShader(vertex);
-        _gl.DeleteShader(fragment);
-        _gl.GetProgram(program, ProgramPropertyARB.LinkStatus, out var linked);
-        if (linked == 0)
-        {
-            var log = _gl.GetProgramInfoLog(program);
-            _gl.DeleteProgram(program);
-            throw new InvalidOperationException($"Shader link failed: {log}");
-        }
-
-        return program;
-    }
-
-    private uint CompileShader(ShaderType type, string source)
-    {
-        var shader = _gl.CreateShader(type);
-        _gl.ShaderSource(shader, source);
-        _gl.CompileShader(shader);
-        _gl.GetShader(shader, ShaderParameterName.CompileStatus, out var compiled);
-        if (compiled == 0)
-        {
-            var log = _gl.GetShaderInfoLog(shader);
-            _gl.DeleteShader(shader);
-            throw new InvalidOperationException($"{type} compile failed: {log}");
-        }
-
-        return shader;
     }
 }

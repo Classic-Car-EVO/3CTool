@@ -31,6 +31,7 @@
     <Project Path="tests/ThreeCTool.Gpu.Tests/ThreeCTool.Gpu.Tests.csproj" />
     <Project Path="tests/ThreeCTool.MoonrakerMock/ThreeCTool.MoonrakerMock.csproj" />
     <Project Path="tests/ThreeCTool.Post.Tests/ThreeCTool.Post.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Rendering.Tests/ThreeCTool.Rendering.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Simulation.Tests/ThreeCTool.Simulation.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Streaming.Tests/ThreeCTool.Streaming.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Thermal.Tests/ThreeCTool.Thermal.Tests.csproj" />
