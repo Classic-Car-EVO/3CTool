@@ -1595,9 +1595,19 @@ namespace ThreeCTool.Data.Migrations.Project
 
                             b1.Property<double?>("MinZ");
 
+                            b1.Property<string>("Pattern")
+                                .IsRequired();
+
+                            b1.Property<int>("PencilPasses");
+
                             b1.Property<double>("RampAngle");
 
                             b1.Property<double>("RasterAngle");
+
+                            b1.Property<double>("RetractClearance");
+
+                            b1.Property<string>("RotaryPattern")
+                                .IsRequired();
 
                             b1.Property<double?>("Stepdown");
 

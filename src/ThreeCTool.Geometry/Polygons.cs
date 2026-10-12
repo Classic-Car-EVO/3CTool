@@ -62,6 +62,42 @@ public static class Polygons
 
     public static double Area(PathsD region) => Clipper.Area(region);
 
+    /// <summary>Connected components: each outer loop with its holes (islands inside holes are separate components).</summary>
+    public static List<PathsD> Components(PathsD region)
+    {
+        var result = new List<PathsD>();
+        if (region.Count == 0)
+        {
+            return result;
+        }
+
+        var clipper = new ClipperD(Precision);
+        clipper.AddSubject(region);
+        var tree = new PolyTreeD();
+        clipper.Execute(ClipType.Union, FillRule.NonZero, tree);
+        var pending = new Stack<PolyPathD>();
+        pending.Push(tree);
+        while (pending.Count > 0)
+        {
+            var node = pending.Pop();
+            for (var i = 0; i < node.Count; i++)
+            {
+                var outer = node[i];
+                var component = new PathsD { outer.Polygon! };
+                for (var j = 0; j < outer.Count; j++)
+                {
+                    var hole = outer[j];
+                    component.Add(hole.Polygon!);
+                    pending.Push(hole);
+                }
+
+                result.Add(component);
+            }
+        }
+
+        return result;
+    }
+
     public static PathsD Rectangle(double minX, double minY, double maxX, double maxY) =>
         [new PathD([new PointD(minX, minY), new PointD(maxX, minY), new PointD(maxX, maxY), new PointD(minX, maxY)])];
 

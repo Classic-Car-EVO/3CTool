@@ -39,6 +39,19 @@ public enum EntryMode
     Helix,
 }
 
+public enum ClearingPattern
+{
+    Offset,
+    Raster,
+}
+
+public enum RotaryPattern
+{
+    Spiral,
+    Rings,
+    Lines,
+}
+
 public sealed class Operation
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -93,6 +106,17 @@ public sealed class OperationParameters
     public double? MinZ { get; set; }
 
     public double? MaxZ { get; set; }
+
+    /// <summary>Z-level roughing and rest machining fill pattern.</summary>
+    public ClearingPattern Pattern { get; set; } = ClearingPattern.Offset;
+
+    public RotaryPattern RotaryPattern { get; set; } = RotaryPattern.Spiral;
+
+    /// <summary>Pencil: number of passes per side of the crease (1 = crease only).</summary>
+    public int PencilPasses { get; set; } = 1;
+
+    /// <summary>Height above the stock (or radius above a rotary stock) for retracts and rapid approaches.</summary>
+    public double RetractClearance { get; set; } = 3;
 }
 
 public sealed class CuttingConditions
