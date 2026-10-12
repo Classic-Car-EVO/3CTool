@@ -95,6 +95,10 @@ public sealed class ComputeContext : IDisposable
         where T : unmanaged =>
         view.SubView(0, destination.Length).CopyToCPU(Accelerator.DefaultStream, destination);
 
+    internal void Copy<T>(ArrayView1D<T, Stride1D.Dense> source, ArrayView1D<T, Stride1D.Dense> target)
+        where T : unmanaged =>
+        source.CopyTo(Accelerator.DefaultStream, target);
+
     /// <summary>Compiled kernel for <paramref name="method"/>, cached per accelerator.</summary>
     internal Action<Index1D, T> Kernel<T>(Action<Index1D, T> method)
         where T : struct =>

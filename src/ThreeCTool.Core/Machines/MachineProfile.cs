@@ -39,6 +39,12 @@ public sealed class MachineProfile
     /// <summary>Imported from FluidNC <c>config.yaml</c>; read-only in 3C Tool.</summary>
     public List<AxisConfig> Axes { get; set; } = [];
 
+    /// <summary>Imported from FluidNC <c>junction_deviation_mm</c>; cornering speed of the motion planner.</summary>
+    public double JunctionDeviation { get; set; } = 0.01;
+
+    /// <summary>Imported from FluidNC <c>planner_blocks</c>; look-ahead depth of the motion planner.</summary>
+    public int PlannerBlocks { get; set; } = 16;
+
     public SpindleConfig Spindle { get; set; } = new();
 
     public RotaryAxisConfig RotaryAxis { get; set; } = new();

@@ -52,7 +52,7 @@ public sealed class Toolhead
     /// <summary>Uses the shared B axis (FDM extruder, knife blade rotation).</summary>
     public bool UsesBAxis { get; set; }
 
-    /// <summary>Collision solids relative to the head reference point (nozzle tip / knife tip).</summary>
+    /// <summary>Collision solids relative to the head reference point (spindle: collet nut face; nozzle tip; knife tip), +Z up.</summary>
     public List<SimpleSolid> CollisionModel { get; set; } = [];
 
     public OperatorConfirmations RequiredConfirmations { get; set; }

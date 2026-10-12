@@ -76,8 +76,8 @@ Delivery: complete feature set at first release (no MVP / phased feature rollout
 ### Machine (initial profile, all configurable; multiple profiles supported)
 | Item | Value |
 |---|---|
-| Travel | X 1300 mm, Y 750 mm, Z 650 mm |
-| A-axis | Rotary around X; max workpiece Ø 400 mm, max length 1000 mm, center height adjustable 160–250 mm |
+| Travel | X 1300 mm, Y 750 mm, Z 600 mm |
+| A-axis | Rotary around X; max workpiece Ø 400 mm, max length 1000 mm, center height adjustable 100–350 mm |
 | Homing | X, Y, Z have homing switches; A is zeroed manually |
 | Spindle | Manual speed dial (continuous), 1500–30000 RPM, 2200 W; software tells operator the RPM |
 | Coolant / dust | Configurable per profile: none / M7 / M8 / dust extraction M-code |
@@ -114,7 +114,7 @@ Delivery: complete feature set at first release (no MVP / phased feature rollout
 | Topic | Decision |
 |---|---|
 | Toolhead | BIQU/BTT USB-C toolhead board (exact model to be confirmed) |
-| Motion | FluidNC (PiBot V4.96 Pro + expansion board); extrusion on the B axis in the same planner as X/Y/Z/A |
+| Motion | FluidNC (PiBot V5.88 Ultra + I/O expander); extrusion on the B axis in the same planner as X/Y/Z/A |
 | Heaters | Klipper with `kinematics: none` on the Pi, only for hotend heater, thermistor, hotend fan (and optional bed); toolhead board connected to the Pi via USB-C; feeder talks to Klipper via the Moonraker API |
 | Part-cooling fan | FluidNC synchronized PWM output (`M67`) on the PiBot/expansion board |
 | Print feed mode | Inverse time (`G93`) for all print moves: exact segment timing regardless of how FluidNC combines X/Y/Z/A/B in its feed calculation |
@@ -157,7 +157,7 @@ flowchart LR
         F --> MR[Moonraker API] --> KL[Klipper host<br/>kinematics: none]
     end
     D -- gRPC over LAN --> F
-    STR2 -- USB serial / TCP telnet --> M[FluidNC<br/>PiBot V4.96 Pro + expansion]
+    STR2 -- USB serial / TCP telnet --> M[FluidNC<br/>PiBot V5.88 Ultra + expansion]
     STR1 -. USB serial / TCP .-> M
     M --> MOT[Motors X1 X2 Y Z1 Z2 A]
     M --> BD[External B driver] --> KM[Kinematic mount<br/>FDM extruder / future knife]
@@ -511,6 +511,32 @@ Progress:
   - Levels exactly at a flat (plus axial stock) are evaluated 0.002 mm above it, which avoids degenerate fibers grazing the face.
   - Boundaries limit the tool centre; the Stock boundary is the stock footprint grown by the tool radius.
   - Rotary setups force the WCS Y/Z onto the A axis.
+- Simulation (section 9): `Simulator.Run` executes the whole project sequence (milling and FDM deposition steps, each in its setup frame) on one tri-dexel stock and returns a `VerificationReport` plus the final stock. Checks:
+  - Shank, holder and spindle head against the in-process stock, in move order.
+  - The whole tool, cutter included, on rapids against stock and part.
+  - The FDM head against stock and printed material.
+  - Keep-out zones (setup, setup-fixed, machine).
+  - Travel span and absolute limits from the homing position.
+
+  The report also gives:
+  - Gouges, attributed to the step that caused them.
+  - Deviation samples for the heatmap.
+  - Cycle time from a GRBL-style planner (`MotionPlanner`: per-axis rate/acceleration, junction deviation, planner-block look-ahead).
+  - Filament length and mass.
+
+  Errors block G-code output unless the user overrides. `SimulationSession` plays the stock back move by move with step checkpoints. Supporting changes:
+  - `DexelStock` gained Clone/CopyFrom/Save/Load.
+  - The machine profile gained junction deviation and planner blocks, imported from FluidNC.
+  - Keep-outs gained a `SetupFixed` attachment for headstock/tailstock: belongs to a setup but does not turn with A.
+
+  Deviations and limits:
+  - Collision poses are sampled every 1 mm and every 0.5° of A. Contact within 0.02 mm is ignored.
+  - For collision, the cutter is a stack of inscribed cylinders.
+  - Stock collisions are checked against the stock at the start of each chunk of moves, and hits are confirmed by replaying the chunk in order. Deposition is checked against the stock after the chunk, from a snapshot.
+  - Part collisions are only reported where the stock is already gone; elsewhere they are stock collisions.
+  - Machine keep-outs and absolute travel need the setup's work offset (machine position of the WCS origin at A = 0); without it there is a warning and only the travel span is checked.
+  - The spindle collision model is relative to the collet nut face; the dust shoe is not modelled yet (installed frame unknown).
+  - Toolpath preview rendering, the layer slider and heatmap display belong to the Desktop UI stage.
 8. Nozzle probing on the conductive tool setter (electrical ground path to the nozzle/heater block).
 
 ---
@@ -536,7 +562,7 @@ Progress:
 | Question | Answer |
 |---|---|
 | Scope | FDM fully in first release; knife architecture provisions only |
-| Firmware | Stay on FluidNC (PiBot V4.96 Pro + expansion) for all motion |
+| Firmware | Stay on FluidNC (PiBot V5.88 Ultra + expansion) for all motion |
 | Heater control | Klipper `kinematics: none` on the Pi, via Moonraker |
 | 7th motor | Shared B axis, external step/dir driver on expansion outputs |
 | Toolhead link | USB-C |
@@ -556,10 +582,20 @@ Progress:
 
 Facts (not design decisions) needed before or during the hardware spikes:
 
-1. Exact BIQU/BTT toolhead board model (e.g. EBB36 / EBB42 / EBB SB2209).
-2. Free step/dir and PWM outputs on the PiBot V4.96 Pro expansion board.
+1. Exact BIQU/BTT toolhead board model. Collected: Creality Sprite Pro extruder with a CRI-2161 board (heater/extruder) on a BTT Hermit Crab CAN/USB quick change.
+2. Free step/dir and PWM outputs on the PiBot V5.88 Ultra (an I/O expander for FluidNC exists but is not attached; B axis TBD).
 3. FDM head geometry (nozzle, heater block, fan duct, mount) for the collision model.
 4. Ground path from nozzle/heater block to the conductive tool setter.
 5. E-stop circuit wiring for the 24 V heater contactor.
 6. Heated bed (if used): type, power, and which Klipper MCU drives it.
 7. Knife type (when the knife project starts).
+8. Dust shoe installed position relative to the spindle (for its collision solids) and tailstock dimensions.
+
+Collected 2026-10-12 (machine "ClassicCarEVO Mill"):
+- Controller: PiBot FluidNC V5.88 Ultra, 6 drivers in use (X dual, Y, Z dual, A).
+- Real travel: X 1300, Y 750, Z 600 mm. The current `config.yaml` max_travel (X 1500, Y 600) is wrong and needs fixing on the controller.
+- FluidNC settings: acceleration 25 mm/s² on all axes (placeholder). Max rates: X/Y 1500 mm/min, Z 1000 mm/min, A 1000°/min. Junction deviation 0.01 mm, 16 planner blocks. Soft and hard limits off. Homing is configured for X only; Y and Z have switches.
+- Spindle: body Ø75 mm, ending 50 mm below the mount. Proprietary collets 1/8", 1/4", 6 and 8 mm (max shank 8 mm); nut Ø20 × 25 mm below the spindle body.
+- Dust shoe: no brushes. It mounts on the spindle's lower end and covers the nut.
+- Rotary: removable headstock 150 W × 350 H × 80 D mm, centre height 250 mm (range 100–350), placed in Y on a 2" grid, centre not calibrated. A is continuous without limits.
+- No fixed obstacles on the table; the tool setter is mobile.

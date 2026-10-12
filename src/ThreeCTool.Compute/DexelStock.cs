@@ -95,6 +95,8 @@ public sealed class DexelStock : IDisposable
     public const int DefaultCapacity = 8;
     private const int TileSize = 16;
     private const int MaxTileEntries = 1 << 23;
+    private const int FileMagic = 0x58444333; // "3CDX"
+    private const int FileVersion = 1;
 
     private readonly Grid[] _grids;
     private readonly MemoryBuffer1D<int, Stride1D.Dense> _overflow;
@@ -356,6 +358,152 @@ public sealed class DexelStock : IDisposable
         }
 
         _overflow?.Dispose();
+    }
+
+    /// <summary>Independent copy of this stock on the same device.</summary>
+    public DexelStock Clone()
+    {
+        var copy = new DexelStock(Compute, Bounds, Resolution, Capacity);
+        try
+        {
+            copy.CopyFrom(this);
+            return copy;
+        }
+        catch
+        {
+            copy.Dispose();
+            throw;
+        }
+    }
+
+    /// <summary>Replaces the material with that of <paramref name="source"/>, which must have the same layout.</summary>
+    public void CopyFrom(DexelStock source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (ReferenceEquals(source, this))
+        {
+            return;
+        }
+
+        if (source.Compute != Compute || source.Bounds != Bounds || source.Resolution != Resolution || source.Capacity != Capacity)
+        {
+            throw new ArgumentException("Stocks differ in device, bounds, resolution or capacity.", nameof(source));
+        }
+
+        lock (Compute.Gate)
+        {
+            for (var axis = 0; axis < 3; axis++)
+            {
+                Compute.Copy(source._grids[axis].Segments.View, _grids[axis].Segments.View);
+                Compute.Copy(source._grids[axis].Counts.View, _grids[axis].Counts.View);
+            }
+
+            Compute.Copy(source._overflow.View, _overflow.View);
+            Compute.Accelerator.Synchronize();
+        }
+    }
+
+    /// <summary>Writes the stock (layout and valid segments) to <paramref name="stream"/>.</summary>
+    public void Save(Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var writer = new BinaryWriter(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+        writer.Write(FileMagic);
+        writer.Write(FileVersion);
+        foreach (var v in new[] { Bounds.Min, Bounds.Max })
+        {
+            writer.Write(v.X);
+            writer.Write(v.Y);
+            writer.Write(v.Z);
+        }
+
+        writer.Write(Resolution);
+        writer.Write(Capacity);
+        writer.Write(OverflowCount);
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var grid = Read((DexelAxis)axis);
+            writer.Write(grid.Counts.Count);
+            for (var ray = 0; ray < grid.Counts.Count; ray++)
+            {
+                var count = grid.Counts[ray];
+                writer.Write7BitEncodedInt(count);
+                for (var k = 0; k < 2 * count; k++)
+                {
+                    writer.Write(grid.Segments[(ray * 2 * Capacity) + k]);
+                }
+            }
+        }
+    }
+
+    /// <summary>Reads a stock written by <see cref="Save"/>.</summary>
+    public static DexelStock Load(ComputeContext compute, Stream stream)
+    {
+        ArgumentNullException.ThrowIfNull(compute);
+        ArgumentNullException.ThrowIfNull(stream);
+        using var reader = new BinaryReader(stream, System.Text.Encoding.UTF8, leaveOpen: true);
+        if (reader.ReadInt32() != FileMagic)
+        {
+            throw new InvalidDataException("Not a dexel stock file.");
+        }
+
+        var version = reader.ReadInt32();
+        if (version != FileVersion)
+        {
+            throw new InvalidDataException($"Unsupported dexel stock file version {version}.");
+        }
+
+        var min = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+        var max = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
+        var resolution = reader.ReadSingle();
+        var capacity = reader.ReadInt32();
+        var overflow = reader.ReadInt64();
+        var stock = new DexelStock(compute, new BoundingBox(min, max), resolution, capacity);
+        try
+        {
+            foreach (var grid in stock._grids)
+            {
+                if (reader.ReadInt32() != grid.Rays)
+                {
+                    throw new InvalidDataException("Dexel stock file does not match its layout.");
+                }
+
+                var segments = new float[grid.Rays * 2 * capacity];
+                var counts = new int[grid.Rays];
+                for (var ray = 0; ray < grid.Rays; ray++)
+                {
+                    var count = reader.Read7BitEncodedInt();
+                    if (count < 0 || count > capacity)
+                    {
+                        throw new InvalidDataException("Dexel stock file exceeds the segment capacity.");
+                    }
+
+                    counts[ray] = count;
+                    for (var k = 0; k < 2 * count; k++)
+                    {
+                        segments[(ray * 2 * capacity) + k] = reader.ReadSingle();
+                    }
+                }
+
+                lock (compute.Gate)
+                {
+                    compute.Upload(grid.Segments.View, segments);
+                    compute.Upload(grid.Counts.View, counts);
+                }
+            }
+
+            lock (compute.Gate)
+            {
+                compute.Upload(stock._overflow.View, [(int)Math.Min(overflow, int.MaxValue)]);
+            }
+
+            return stock;
+        }
+        catch
+        {
+            stock.Dispose();
+            throw;
+        }
     }
 
     private void Sweep(CutterProfile cutter, ReadOnlySpan<ToolMove> moves, float tipOffset, bool add)
