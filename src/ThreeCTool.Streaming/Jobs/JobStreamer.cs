@@ -28,6 +28,7 @@ public sealed class JobStreamer : IDisposable
 {
     public const int MaxLineNumber = 9_999_999;
     private const int MotionHistory = 1024;
+    private static readonly TimeSpan AlarmHandlerGrace = TimeSpan.FromSeconds(2);
 
     private readonly ControllerConnection connection;
     private readonly JobFile file;
@@ -204,6 +205,15 @@ public sealed class JobStreamer : IDisposable
             && (runCancellation.IsCancellationRequested || cancellationToken.IsCancellationRequested || !connection.IsConnected || connection.NeedsResync))
         {
             // Stop, fault or disconnect: the handlers have set the state.
+            if (connection.NeedsResync && State == JobState.Running)
+            {
+                // The connection is marked for resync just before it raises the alarm on the reader thread.
+                await Task.WhenAny(faulted.Task, Task.Delay(AlarmHandlerGrace, CancellationToken.None)).ConfigureAwait(false);
+                if (State == JobState.Running)
+                {
+                    Fault(InterruptionKind.Alarm, 0, Progress.Executed, "Controller needs resynchronization");
+                }
+            }
         }
         finally
         {
