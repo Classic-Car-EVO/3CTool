@@ -560,6 +560,26 @@ Progress:
   - Inverse-time feeds for rotary moves are written by the Post stage.
   - Viewing and resetting corrections is Desktop UI work.
   - The default machine now uses the real travel (Z 600) and proprietary collets with a Ø20 × 25 mm nut, and the spindle body starts at the nut.
+- Post, milling (section 10): `FluidNcMillingPost` writes one file per tool group of a setup (FDM files and knife hooks come later). Contents in order:
+  - Header comments: project, setup, WCS and setup kind, tool, collet, material, RPM, probe method, operations, estimated time, generator version, input hashes, warnings.
+  - Preamble `G21 G90 G94 G17 G91.1 G5x`, safe Z, then the tool-insert prompt (`M0`).
+  - Tool length by tool setter plus a stored reference, using FluidNC expressions. The first file of a setup touches the plate on the stock (`G10 L20`). With the setter method, it then probes the setter and stores that height in G59 Z (`G10 L2 P6 Z[#5063]`). Every file probes the setter and sets `G43.1 Z[#5063-#5323]`, so later tools cut at the same work Z without the plate. With the touch-plate method every file uses the plate (`G49`, `G10 L20`). Plate blocks are marked `(MC:PROBE BEGIN TOUCHPLATE)`, so recovery asks the operator to place and remove the plate.
+  - Spindle: `M3 S<rpm>` is sent, and an `M0` prompt asks the operator to confirm the RPM (manual dial today, automated later). Then coolant and dust codes.
+  - Moves: G2/G3 arc fitting in G17/G18/G19 (helical, incremental IJK). The fit stays within min(machine, project) tolerance, sweeps at most 270° and keeps the radius consistent after rounding. A moves use `G93` inverse time, other moves `G94`. Feeds come from the conditions times the simulator's per-move feed factors.
+  - Footer: safe Z, coolant and dust off, `M5`, `M30`.
+
+  Checks before writing:
+  - Verification errors block output unless overridden; an override is noted in the header.
+  - Toolpath/tool/setup consistency and RPM range.
+  - Travel span, and absolute travel when the work offset is known, including the plate spot, the setter and safe Z.
+  - Probe distances and line length (120 characters).
+
+  `GcodeFileStore` writes the file under the project's `gcode/` folder (atomic replace, path-traversal guard) and registers it with SHA-256 in SQLite. The streamer and the simulator now handle `#` parameters and `[...]` expressions. Golden-file and arc-reconstruction tests are complemented by end-to-end tests that stream posted files to the simulator, including e-stop recovery with probe replay.
+
+  Assumptions and limits:
+  - FluidNC reports `#5063` (last probe Z) in machine coordinates. To be confirmed in spike 2.
+  - G59 is reserved as the setter reference and is shared by all setups. The first file of a new setup overwrites it, so files of an earlier setup must not be run after it without running that setup's first file again.
+  - An expression `G43.1` leaves the tool length offset unknown in the host's modal state. Recovery re-probes instead of restoring a value.
 8. Nozzle probing on the conductive tool setter (electrical ground path to the nozzle/heater block).
 
 ---

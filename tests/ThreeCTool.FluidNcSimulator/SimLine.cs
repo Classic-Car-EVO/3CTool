@@ -12,7 +12,11 @@ internal sealed class SimLine
 
     public IReadOnlyList<(char Letter, double Value)> Words => words;
 
-    public static int TryParse(string text, out SimLine line)
+    /// <summary>
+    /// Parses a line; word values may be numbered parameters (<c>#5063</c>) or bracketed expressions with
+    /// <c>+ - * /</c> (FluidNC parameters and expressions). Returns 0 or a Grbl error code.
+    /// </summary>
+    public static int TryParse(string text, out SimLine line, Func<int, double?>? parameter = null)
     {
         line = new SimLine([]);
         var clean = new StringBuilder();
@@ -47,15 +51,29 @@ internal sealed class SimLine
                 return 1; // Expected command letter
             }
 
-            var start = i;
-            while (i < s.Length && (char.IsAsciiDigit(s[i]) || s[i] is '.' or '-' or '+'))
+            double value;
+            if (i < s.Length && s[i] is '#' or '[')
             {
-                i++;
-            }
+                var parsed = new ExpressionParser(s, i, parameter);
+                if (!parsed.TryPrimary(out value))
+                {
+                    return 2;
+                }
 
-            if (!double.TryParse(s.AsSpan(start, i - start), NumberStyles.Float, CultureInfo.InvariantCulture, out var value))
+                i = parsed.Position;
+            }
+            else
             {
-                return 2; // Bad number format
+                var start = i;
+                while (i < s.Length && (char.IsAsciiDigit(s[i]) || s[i] is '.' or '-' or '+'))
+                {
+                    i++;
+                }
+
+                if (!double.TryParse(s.AsSpan(start, i - start), NumberStyles.Float, CultureInfo.InvariantCulture, out value))
+                {
+                    return 2; // Bad number format
+                }
             }
 
             line.words.Add((letter, value));
@@ -82,4 +100,110 @@ internal sealed class SimLine
     }
 
     public IEnumerable<double> All(char letter) => words.Where(w => w.Letter == letter).Select(w => w.Value);
+}
+
+/// <summary>Numbered parameters and <c>[...]</c> expressions with <c>+ - * /</c> and unary signs.</summary>
+internal sealed class ExpressionParser(string text, int position, Func<int, double?>? parameter)
+{
+    public int Position { get; private set; } = position;
+
+    public bool TryPrimary(out double value)
+    {
+        value = double.NaN;
+        if (Position >= text.Length)
+        {
+            return false;
+        }
+
+        if (text[Position] == '[')
+        {
+            Position++;
+            if (!TryExpression(out value) || Position >= text.Length || text[Position] != ']')
+            {
+                return false;
+            }
+
+            Position++;
+            return true;
+        }
+
+        if (text[Position] == '#')
+        {
+            Position++;
+            if (!TryPrimary(out var number) || number != Math.Floor(number) || parameter?.Invoke((int)number) is not { } found)
+            {
+                return false;
+            }
+
+            value = found;
+            return true;
+        }
+
+        var start = Position;
+        while (Position < text.Length && (char.IsAsciiDigit(text[Position]) || text[Position] == '.'))
+        {
+            Position++;
+        }
+
+        return double.TryParse(text.AsSpan(start, Position - start), NumberStyles.Float, CultureInfo.InvariantCulture, out value);
+    }
+
+    private bool TryExpression(out double value)
+    {
+        if (!TryTerm(out value))
+        {
+            return false;
+        }
+
+        while (Position < text.Length && text[Position] is '+' or '-')
+        {
+            var op = text[Position++];
+            if (!TryTerm(out var right))
+            {
+                return false;
+            }
+
+            value = op == '+' ? value + right : value - right;
+        }
+
+        return true;
+    }
+
+    private bool TryTerm(out double value)
+    {
+        if (!TryUnary(out value))
+        {
+            return false;
+        }
+
+        while (Position < text.Length && text[Position] is '*' or '/')
+        {
+            var op = text[Position++];
+            if (!TryUnary(out var right))
+            {
+                return false;
+            }
+
+            value = op == '*' ? value * right : value / right;
+        }
+
+        return true;
+    }
+
+    private bool TryUnary(out double value)
+    {
+        if (Position < text.Length && text[Position] is '-' or '+')
+        {
+            var negative = text[Position++] == '-';
+            if (!TryUnary(out value))
+            {
+                return false;
+            }
+
+            value = negative ? -value : value;
+            return true;
+        }
+
+        return TryPrimary(out value);
+    }
 }

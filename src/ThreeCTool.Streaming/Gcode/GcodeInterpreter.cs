@@ -209,7 +209,9 @@ public sealed class GcodeInterpreter(double rotaryRadiusMm = 20)
 
         if (HasG(43.1))
         {
-            s.ToolLengthOffset = Scale(block.Get('Z') ?? 0, 2);
+            // An expression (e.g. a probe result) is only known to the controller.
+            var z = block.Get('Z') ?? 0;
+            s.ToolLengthOffset = double.IsNaN(z) ? null : Scale(z, 2);
             ForgetWorkAxes(2);
         }
         else if (HasG(49))
