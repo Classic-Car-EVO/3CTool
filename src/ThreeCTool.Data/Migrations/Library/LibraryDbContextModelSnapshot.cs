@@ -62,6 +62,9 @@ namespace ThreeCTool.Data.Migrations.Library
                     b.Property<int?>("ChatterRating")
                         .HasColumnType("INTEGER");
 
+                    b.Property<string>("FeederRunId")
+                        .HasColumnType("TEXT");
+
                     b.Property<int?>("FinishRating")
                         .HasColumnType("INTEGER");
 
@@ -89,6 +92,9 @@ namespace ThreeCTool.Data.Migrations.Library
                         .HasColumnType("INTEGER");
 
                     b.HasKey("Id");
+
+                    b.HasIndex("FeederRunId")
+                        .IsUnique();
 
                     b.ToTable("JobFeedback");
                 });
@@ -179,6 +185,53 @@ namespace ThreeCTool.Data.Migrations.Library
                     b.HasKey("Id");
 
                     b.ToTable("MachineProfiles");
+                });
+
+            modelBuilder.Entity("ThreeCTool.Core.Machines.PairedFeeder", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Address")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("CertificateFingerprint")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("FeederId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset?>("LastSyncAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("MachineProfileId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<DateTimeOffset>("PairedAt")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("PairingId")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Token")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("FeederId")
+                        .IsUnique();
+
+                    b.ToTable("PairedFeeders");
                 });
 
             modelBuilder.Entity("ThreeCTool.Core.Machines.Toolhead", b =>

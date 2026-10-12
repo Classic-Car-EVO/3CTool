@@ -3,6 +3,7 @@
   <ItemGroup>
     <ProjectReference Include="..\..\src\ThreeCTool.Feeder.Service\ThreeCTool.Feeder.Service.csproj" />
     <ProjectReference Include="..\..\src\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ThreeCTool.Desktop\ThreeCTool.Desktop.csproj" />
     <ProjectReference Include="..\ThreeCTool.FluidNcSimulator\ThreeCTool.FluidNcSimulator.csproj" />
   </ItemGroup>
 

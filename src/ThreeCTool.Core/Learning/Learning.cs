@@ -59,6 +59,9 @@ public sealed class JobFeedback
 
     public string GcodeSha256 { get; set; } = string.Empty;
 
+    /// <summary>Feeder run this feedback was imported from (null when entered on the desktop); makes imports idempotent.</summary>
+    public string? FeederRunId { get; set; }
+
     public Guid? MaterialId { get; set; }
 
     public Guid? ToolId { get; set; }

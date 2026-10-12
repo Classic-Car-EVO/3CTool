@@ -33,6 +33,8 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
 
     public DbSet<LibrarySetting> Settings => Set<LibrarySetting>();
 
+    public DbSet<PairedFeeder> PairedFeeders => Set<PairedFeeder>();
+
     protected override void ConfigureConventions(ModelConfigurationBuilder configurationBuilder) =>
         SharedModel.ConfigureConventions(configurationBuilder);
 
@@ -46,7 +48,9 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
         {
             e.OwnsMany(f => f.FeedOverrides, o => o.ToJson());
             e.OwnsMany(f => f.RpmChanges, o => o.ToJson());
+            e.HasIndex(f => f.FeederRunId).IsUnique();
         });
+        modelBuilder.Entity<PairedFeeder>(e => e.HasIndex(f => f.FeederId).IsUnique());
         modelBuilder.Entity<LibrarySetting>().HasKey(s => s.Key);
     }
 }
