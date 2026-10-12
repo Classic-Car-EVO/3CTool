@@ -69,13 +69,13 @@ public sealed class LineRenderer : IDisposable
 
     public bool ShowRapids { get; set; } = true;
 
-    public Vector4 CutColor { get; set; } = new(0.35f, 0.65f, 1f, 1f);
+    public Vector4 CutColor { get; set; } = ToolpathColors.Cut;
 
-    public Vector4 RapidColor { get; set; } = new(1f, 0.55f, 0.15f, 0.7f);
+    public Vector4 RapidColor { get; set; } = ToolpathColors.Rapid;
 
-    public Vector4 DoneColor { get; set; } = new(0.3f, 0.85f, 0.4f, 1f);
+    public Vector4 DoneColor { get; set; } = ToolpathColors.Done;
 
-    public Vector4 MarkerColor { get; set; } = new(1f, 0.25f, 0.25f, 1f);
+    public Vector4 MarkerColor { get; set; } = ToolpathColors.Marker;
 
     public float LineWidth { get; set; } = 1.5f;
 
