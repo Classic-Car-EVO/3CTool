@@ -45,6 +45,12 @@ internal struct DexelSweepArgs
     public int ForceGeneral;
     public float MinLength;
     public ArrayView<int> Overflow;
+
+    /// <summary>Per move piece: removed length summed over the rays, in units of 1/<see cref="MeasureScale"/> mm.</summary>
+    public ArrayView<long> Removed;
+
+    /// <summary>0 = no measurement; otherwise units per mm of removed ray length.</summary>
+    public float MeasureScale;
 }
 
 internal struct DexelMeshArgs
@@ -107,6 +113,15 @@ internal static class DexelKernel
                 }
                 else
                 {
+                    if (args.MeasureScale > 0)
+                    {
+                        var removed = IntervalList.Overlap(list, count, a, b);
+                        if (removed > 0)
+                        {
+                            Atomic.Add(ref args.Removed[args.TileMoves[m]], (long)((removed * args.MeasureScale) + 0.5f));
+                        }
+                    }
+
                     count = IntervalList.Subtract(list, count, capacity, a, b, args.MinLength, ref overflow);
                 }
             }

@@ -17,6 +17,8 @@ public static class BuiltInLibrary
 {
     public const int Version = 1;
 
+    private const double ColletNutLength = 25;
+
     // Chip load table diameters (mm) shared by all materials below.
     private static readonly double[] ChipLoadDiameters = [1, 3.175, 6, 8, 12];
 
@@ -40,7 +42,7 @@ public static class BuiltInLibrary
             [
                 LinearAxis(AxisName.X, travel: 1300, motors: 2, homingCycle: 2),
                 LinearAxis(AxisName.Y, travel: 750, motors: 1, homingCycle: 2),
-                LinearAxis(AxisName.Z, travel: 650, motors: 2, homingCycle: 1, homePositive: true),
+                LinearAxis(AxisName.Z, travel: 600, motors: 2, homingCycle: 1, homePositive: true),
                 new AxisConfig { Axis = AxisName.A, StepsPerUnit = 44.444, MaxRatePerMinute = 7200, AccelerationPerSecond2 = 200 },
                 new AxisConfig { Axis = AxisName.B, StepsPerUnit = 400, MaxRatePerMinute = 3000, AccelerationPerSecond2 = 1000 },
             ],
@@ -57,6 +59,12 @@ public static class BuiltInLibrary
                     Name = "Spindle 2.2 kW",
                     Type = ToolheadType.Spindle,
                     Mount = MountType.Fixed,
+
+                    // Relative to the collet nut face; the nut itself is the collets' holder segment.
+                    CollisionModel =
+                    [
+                        new SimpleSolid { Name = "Spindle body", Shape = SolidShape.Cylinder, Radius = 37.5, BottomZ = ColletNutLength, Height = 50 },
+                    ],
                 },
                 new Toolhead
                 {
@@ -79,10 +87,10 @@ public static class BuiltInLibrary
             ],
             Collets =
             [
-                Collet(machineId, "ER20 1/8\"", Units.ToMillimeters(0.125, LengthUnit.Inch)),
-                Collet(machineId, "ER20 1/4\"", Units.ToMillimeters(0.25, LengthUnit.Inch)),
-                Collet(machineId, "ER20 6 mm", 6),
-                Collet(machineId, "ER20 8 mm", 8),
+                Collet(machineId, "Collet 1/8\"", Units.ToMillimeters(0.125, LengthUnit.Inch)),
+                Collet(machineId, "Collet 1/4\"", Units.ToMillimeters(0.25, LengthUnit.Inch)),
+                Collet(machineId, "Collet 6 mm", 6),
+                Collet(machineId, "Collet 8 mm", 8),
             ],
         };
     }
@@ -173,11 +181,7 @@ public static class BuiltInLibrary
         MachineProfileId = machineId,
         Name = name,
         ShankDiameter = shank,
-        Holder =
-        [
-            new HolderSegment { Diameter = 35, Length = 20 },
-            new HolderSegment { Diameter = 80, Length = 220 },
-        ],
+        Holder = [new HolderSegment { Diameter = 20, Length = ColletNutLength }],
     };
 
     private static Material Material(

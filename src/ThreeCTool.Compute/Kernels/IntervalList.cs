@@ -62,6 +62,18 @@ internal static class IntervalList
         return count + shift;
     }
 
+    /// <summary>Total length of the list inside (a, b).</summary>
+    public static float Overlap(ArrayView<float> list, int count, float a, float b)
+    {
+        var total = 0f;
+        for (var k = 0; k < count; k++)
+        {
+            total += MathF.Max(0, MathF.Min(list[(2 * k) + 1], b) - MathF.Max(list[2 * k], a));
+        }
+
+        return total;
+    }
+
     /// <summary>
     /// Removes (a, b) from the list. A split that does not fit leaves the hole unremoved instead (keeps more coverage).
     /// Pieces shorter than <paramref name="minLength"/> are dropped.

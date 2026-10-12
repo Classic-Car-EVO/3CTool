@@ -230,23 +230,33 @@ internal sealed class PreparedStep
         }
     }
 
-    /// <summary>Applies the material change of <paramref name="segments"/> (removal or deposition) to the stock.</summary>
-    public void Apply(DexelStock stock, ReadOnlySpan<Segment> segments)
+    /// <summary>
+    /// Applies the material change of <paramref name="segments"/> (removal or deposition) to the stock; for milling,
+    /// adds the removed volume per source move to <paramref name="removed"/> when given.
+    /// </summary>
+    public void Apply(DexelStock stock, ReadOnlySpan<Segment> segments, double[]? removed = null)
     {
         if (IsMilling)
         {
             var moves = new List<ToolMove>(segments.Length);
+            var sources = new List<int>(segments.Length);
             foreach (var s in segments)
             {
                 if (s.Active)
                 {
                     moves.Add(s.Move);
+                    sources.Add(s.Source);
                 }
             }
 
             if (moves.Count > 0)
             {
-                stock.Remove(Cutter, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(moves));
+                var volumes = removed is null ? [] : new double[moves.Count];
+                stock.Remove(Cutter, System.Runtime.InteropServices.CollectionsMarshal.AsSpan(moves), volumes);
+                for (var i = 0; i < volumes.Length; i++)
+                {
+                    removed![sources[i]] += volumes[i];
+                }
             }
 
             return;

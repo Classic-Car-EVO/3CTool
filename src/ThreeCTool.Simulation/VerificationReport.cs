@@ -27,6 +27,9 @@ public enum IssueKind
 
     /// <summary>Input missing; a check was skipped or a default was used.</summary>
     MissingData,
+
+    /// <summary>Moves cutting more than the nominal engagement run at a reduced feed.</summary>
+    FeedReduced,
 }
 
 public enum IssueSeverity
@@ -61,6 +64,9 @@ public sealed class StepSummary
 
     /// <summary>Time (s, from the step start) at which each move finishes.</summary>
     public required double[] MoveEndTimes { get; init; }
+
+    /// <summary>Milling: per move, the share of the nominal feed after engagement slowdown (1 = nominal).</summary>
+    public float[] FeedFactors { get; init; } = [];
 
     /// <summary>Material removed (negative) or deposited (positive) by the step (mm³).</summary>
     public double VolumeChange { get; init; }
