@@ -2,6 +2,9 @@
 
   <ItemGroup>
     <ProjectReference Include="..\ThreeCTool.Core\ThreeCTool.Core.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Data\ThreeCTool.Data.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Simulation\ThreeCTool.Simulation.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Toolpaths\ThreeCTool.Toolpaths.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

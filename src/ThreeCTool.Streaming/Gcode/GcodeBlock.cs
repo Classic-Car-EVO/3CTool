@@ -3,9 +3,15 @@ using System.Text;
 
 namespace ThreeCTool.Streaming.Gcode;
 
-/// <summary>A letter/number word such as <c>G38.2</c> or <c>X-1.25</c>; <see cref="Number"/> keeps the original text.</summary>
+/// <summary>
+/// A letter/number word such as <c>G38.2</c> or <c>X-1.25</c>; <see cref="Number"/> keeps the original text. A value
+/// given as a parameter or expression (<c>Z#5063</c>, <c>Z[#5063-#5323]</c>) is evaluated by the controller: its
+/// <see cref="Value"/> is NaN.
+/// </summary>
 public readonly record struct GcodeWord(char Letter, double Value, string Number)
 {
+    public bool IsExpression => Number.Length > 0 && Number[0] is '#' or '[';
+
     public bool IsCode(char letter, double code) => Letter == letter && Math.Abs(Value - code) < 1e-6;
 
     public override string ToString() => Letter + Number;
@@ -170,6 +176,17 @@ public sealed class GcodeBlock
         {
             var letter = text[pos];
             var start = ++pos;
+            if (char.IsAsciiLetterUpper(letter) && pos < text.Length && text[pos] is '#' or '[')
+            {
+                if (!SkipExpression(text, ref pos))
+                {
+                    return new GcodeBlock(raw, [], comments, null, text);
+                }
+
+                words.Add(new GcodeWord(letter, double.NaN, text[start..pos]));
+                continue;
+            }
+
             while (pos < text.Length && (char.IsAsciiDigit(text[pos]) || text[pos] is '.' or '-' or '+'))
             {
                 pos++;
@@ -186,5 +203,53 @@ public sealed class GcodeBlock
         }
 
         return new GcodeBlock(raw, words, comments, null, null);
+    }
+
+    /// <summary>Skips a parameter reference (<c>#5063</c>, <c>#&lt;name&gt;</c>) or a bracketed expression.</summary>
+    private static bool SkipExpression(string text, ref int pos)
+    {
+        if (text[pos] == '[')
+        {
+            var depth = 0;
+            do
+            {
+                depth += text[pos] switch { '[' => 1, ']' => -1, _ => 0 };
+                pos++;
+            }
+            while (depth > 0 && pos < text.Length);
+
+            return depth == 0;
+        }
+
+        pos++;
+        if (pos >= text.Length)
+        {
+            return false;
+        }
+
+        if (text[pos] == '<')
+        {
+            var end = text.IndexOf('>', pos);
+            if (end < 0)
+            {
+                return false;
+            }
+
+            pos = end + 1;
+            return true;
+        }
+
+        if (text[pos] is '#' or '[')
+        {
+            return SkipExpression(text, ref pos);
+        }
+
+        var start = pos;
+        while (pos < text.Length && char.IsAsciiDigit(text[pos]))
+        {
+            pos++;
+        }
+
+        return pos > start;
     }
 }

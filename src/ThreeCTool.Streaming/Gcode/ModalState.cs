@@ -65,7 +65,7 @@ public sealed class ModalState
 
     public bool[] G92Active { get; } = new bool[AxisCount];
 
-    /// <summary>Last G43.1 value (mm); 0 after G49; null if the file never set it.</summary>
+    /// <summary>Last G43.1 value (mm); 0 after G49; null if the file never set it or set it from an expression.</summary>
     public double? ToolLengthOffset { get; set; }
 
     /// <summary>Last plain comment, used as the M0 prompt.</summary>

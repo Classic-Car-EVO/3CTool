@@ -269,8 +269,15 @@ public sealed class RecoveryExecutor(
     {
         if (options.Process == JobProcess.Milling && plan.Probe is { } probe)
         {
-            if (!await ConfirmAsync($"Re-probing the tool length (file lines {probe.BeginLine}-{probe.EndLine}). Spindle must be stopped.", cancellationToken)
-                .ConfigureAwait(false))
+            var begin = GcodeBlock.Parse(file.ReadLine(probe.BeginLine) ?? string.Empty).Directive;
+            var touchPlate = begin is { Arguments: [_, "TOUCHPLATE", ..] };
+            var message = $"Re-probing the tool length (file lines {probe.BeginLine}-{probe.EndLine}). Spindle must be stopped.";
+            if (touchPlate)
+            {
+                message += " Place the touch plate on the stock top under the probe position and attach the probe clip.";
+            }
+
+            if (!await ConfirmAsync(message, cancellationToken).ConfigureAwait(false))
             {
                 throw new OperationCanceledException("Recovery cancelled by the operator.");
             }
@@ -281,8 +288,9 @@ public sealed class RecoveryExecutor(
                 cancellationToken).ConfigureAwait(false);
             foreach (var (_, text) in file.ReadLines(probe.BeginLine).TakeWhile(l => l.Line <= probe.EndLine))
             {
+                // Operator pauses inside the routine are replaced by the confirmations here.
                 var block = GcodeBlock.Parse(text);
-                if (block.HasCode)
+                if (block.HasCode && !block.HasM(0) && !block.HasM(1))
                 {
                     await connection.ExecuteOkAsync(block.ToWire(), LongTimeout, cancellationToken).ConfigureAwait(false);
                 }
@@ -290,6 +298,11 @@ public sealed class RecoveryExecutor(
 
             var after = await connection.QueryWorkCoordinatesAsync(cancellationToken).ConfigureAwait(false);
             Log($"Tool length re-probed: TLO {F(after.ToolLengthOffset)} (before interruption {F(progress.ToolLengthOffset ?? 0)}).", flush: true);
+            if (touchPlate && !await ConfirmAsync("Remove the touch plate and the probe clip.", cancellationToken).ConfigureAwait(false))
+            {
+                throw new OperationCanceledException("Recovery cancelled by the operator.");
+            }
+
             return;
         }
 

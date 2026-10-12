@@ -2,6 +2,7 @@ using System.Security.Cryptography;
 
 using Microsoft.Data.Sqlite;
 
+using ThreeCTool.FluidNcSimulator;
 using ThreeCTool.Streaming.Gcode;
 using ThreeCTool.Streaming.Jobs;
 using ThreeCTool.Streaming.Protocol;
@@ -197,6 +198,50 @@ public sealed class GcodeTests
         Assert.Equal(0, interpreter.State.Position[2]);
         interpreter.Apply(GcodeBlock.Parse("(MC:PROBE END)"), 7);
         Assert.False(interpreter.InProbeBlock);
+    }
+
+    [Fact]
+    public void Parse_ExpressionWords_KeepTheirTextAndHaveNoValue()
+    {
+        var block = GcodeBlock.Parse("G43.1 Z[#5063 - [#5323 + 1]] (tlo)");
+
+        Assert.Null(block.Unparsed);
+        var z = Assert.Single(block.Words, w => w.Letter == 'Z');
+        Assert.True(z.IsExpression);
+        Assert.True(double.IsNaN(z.Value));
+        Assert.Equal("G43.1Z[#5063-[#5323+1]]", block.ToWire());
+        Assert.True(GcodeBlock.Parse("G10 L2 P6 Z#5063").Words[^1].IsExpression);
+        Assert.NotNull(GcodeBlock.Parse("G1 X[1+2").Unparsed);
+    }
+
+    [Fact]
+    public void Apply_G43_1WithExpression_MakesTheToolLengthOffsetUnknown()
+    {
+        var interpreter = new GcodeInterpreter();
+        interpreter.Apply(GcodeBlock.Parse("G43.1 Z5"), 1);
+        Assert.Equal(5, interpreter.State.ToolLengthOffset);
+
+        interpreter.Apply(GcodeBlock.Parse("G43.1 Z[#5063-#5323]"), 2);
+        Assert.Null(interpreter.State.ToolLengthOffset);
+    }
+
+    [Fact]
+    public async Task Simulator_EvaluatesProbeAndOffsetParameters()
+    {
+        await using var sim = await SimHarness.StartAsync(new SimulatorOptions { ProbeSurfaceMachineZ = -350 });
+        var connection = await sim.ConnectAsync();
+
+        await connection.ExecuteOkAsync("G10L2P6Z-100");
+        await connection.ExecuteOkAsync("G43.1Z[#5323+5]");
+        Assert.Equal(-95, (await connection.QueryWorkCoordinatesAsync()).ToolLengthOffset, 6);
+
+        await connection.ExecuteOkAsync("G49");
+        await connection.ExecuteOkAsync("G91G38.2Z-600F3000");
+        await connection.ExecuteOkAsync("G90");
+        await connection.ExecuteOkAsync("G10L2P6Z[#5063]");
+        Assert.Equal(-350, sim.Simulator.WorkOffset(5)[2], 6);
+        await connection.ExecuteOkAsync("G43.1Z[#5063-[#5323+10]]");
+        Assert.Equal(-10, (await connection.QueryWorkCoordinatesAsync()).ToolLengthOffset, 6);
     }
 }
 

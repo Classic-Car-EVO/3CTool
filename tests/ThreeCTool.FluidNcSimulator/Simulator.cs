@@ -48,6 +48,7 @@ public sealed class Simulator : IDisposable
     private double[] probePosition;
     private bool probeSuccess;
     private double tlo;
+    private double toolLength;
     private Modal modal = new();
     private PlannerBlock? current;
     private SimChannel? lineChannel;
@@ -109,6 +110,19 @@ public sealed class Simulator : IDisposable
     public bool Flood => Read(() => modal.Flood);
 
     public double ToolLengthOffset => Read(() => tlo);
+
+    /// <summary>Length of the tool in the spindle (mm): a longer tool touches a probe surface at a higher machine Z.</summary>
+    public double ToolLength
+    {
+        get => Read(() => toolLength);
+        set
+        {
+            lock (gate)
+            {
+                toolLength = value;
+            }
+        }
+    }
 
     public int FeedOverride => Read(() => feedOverride);
 
@@ -273,6 +287,35 @@ public sealed class Simulator : IDisposable
     private static string Format(IEnumerable<double> values) =>
         string.Join(',', values.Select(v => v.ToString("0.000", CultureInfo.InvariantCulture)));
 
+    /// <summary>How far the tool tip is below the probe surface under it (≥ 0 = contact).</summary>
+    private double ProbeDepth()
+    {
+        var surface = Options.ProbeSurfaceAt?.Invoke(physical[0], physical[1]) ?? Options.ProbeSurfaceMachineZ;
+        return surface - (physical[2] - toolLength);
+    }
+
+    /// <summary>Numbered parameters readable by expressions: probe result, work offsets, tool length offset.</summary>
+    private double? Parameter(int number)
+    {
+        if (number is >= 5061 and <= 5069)
+        {
+            return number - 5061 < axisCount ? probePosition[number - 5061] : 0;
+        }
+
+        if (number == 5070)
+        {
+            return probeSuccess ? 1 : 0;
+        }
+
+        if (number is >= 5221 and <= 5329)
+        {
+            var (system, axis) = Math.DivRem(number - 5221, 20);
+            return axis < axisCount ? wcs[system][axis] : axis < 9 ? 0 : null;
+        }
+
+        return number == 5403 ? tlo : null;
+    }
+
     private static (int A, int B, int Linear) PlaneAxes(int plane) => plane switch
     {
         18 => (2, 0, 1),
@@ -395,10 +438,10 @@ public sealed class Simulator : IDisposable
                 SetPosition([.. block.Start!.Select((s, i) => s + ((block.Target[i] - s) * t))]);
             }
 
-            if (block.Probe && block.Target[2] < block.Start![2] && physical[2] <= Options.ProbeSurfaceMachineZ)
+            if (block.Probe && block.Target[2] < block.Start![2] && ProbeDepth() >= 0)
             {
                 // Contact: stop exactly at the surface.
-                var overshoot = Options.ProbeSurfaceMachineZ - physical[2];
+                var overshoot = ProbeDepth();
                 var adjusted = (double[])mpos.Clone();
                 adjusted[2] += overshoot;
                 SetPosition(adjusted);
@@ -609,7 +652,7 @@ public sealed class Simulator : IDisposable
 
         if (step.Phase == 0)
         {
-            if (physical[2] <= Options.ProbeSurfaceMachineZ && step.Code is 38.2 or 38.3)
+            if (ProbeDepth() >= 0 && step.Code is 38.2 or 38.3)
             {
                 Alarm(4);
                 return false;
@@ -670,7 +713,7 @@ public sealed class Simulator : IDisposable
             return "error:9";
         }
 
-        var code = SimLine.TryParse(text, out var line);
+        var code = SimLine.TryParse(text, out var line, Parameter);
         if (code != 0)
         {
             return $"error:{code}";

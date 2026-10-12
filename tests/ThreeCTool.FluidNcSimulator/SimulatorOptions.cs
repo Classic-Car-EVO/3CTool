@@ -28,6 +28,9 @@ public sealed class SimulatorOptions
     /// <summary>Physical machine Z at which a probe move makes contact (tool setter / touch plate).</summary>
     public double ProbeSurfaceMachineZ { get; set; } = -600;
 
+    /// <summary>Probe surface machine Z at a physical machine X/Y (tool length 0); null = <see cref="ProbeSurfaceMachineZ"/> everywhere.</summary>
+    public Func<double, double, double>? ProbeSurfaceAt { get; set; }
+
     public string Version { get; set; } = "3.9.5";
 
     public double HomingSeconds { get; set; } = 0.5;
