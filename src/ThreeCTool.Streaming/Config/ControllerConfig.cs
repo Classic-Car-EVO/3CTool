@@ -73,6 +73,8 @@ public sealed class ControllerConfig
 
     public int PlannerBlocks => (int)(Root.GetDouble("planner_blocks") ?? 16);
 
+    public double JunctionDeviation => Root.GetDouble("junction_deviation_mm") ?? 0.01;
+
     public bool MustHome => Root.GetBool("start/must_home") ?? true;
 
     public static ControllerConfig Parse(IEnumerable<string> lines)

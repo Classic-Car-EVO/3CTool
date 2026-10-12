@@ -163,9 +163,15 @@ namespace ThreeCTool.Data.Migrations.Library
                     b.Property<double>("ArcFittingTolerance")
                         .HasColumnType("REAL");
 
+                    b.Property<double>("JunctionDeviation")
+                        .HasColumnType("REAL");
+
                     b.Property<string>("Name")
                         .IsRequired()
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("PlannerBlocks")
+                        .HasColumnType("INTEGER");
 
                     b.Property<double>("SafeZMachine")
                         .HasColumnType("REAL");

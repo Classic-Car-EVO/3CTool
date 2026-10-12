@@ -339,6 +339,53 @@ public class DexelStockTests(CpuComputeFixture fixture) : IClassFixture<CpuCompu
         }
     }
 
+    [Fact]
+    public void Clone_IsIndependent_AndCopyFromRestores()
+    {
+        using var stock = DexelStock.Box(_compute, Block(40, 20, 10), 0.5f);
+        stock.Remove(CutterProfile.Flat(6, 20), [new ToolMove(new Vector3(5, 10, 7), new Vector3(35, 10, 7))]);
+        using var copy = stock.Clone();
+        var cut = stock.Volume();
+        Assert.Equal(cut, copy.Volume(), 6);
+
+        stock.Remove(CutterProfile.Flat(6, 20), [new ToolMove(new Vector3(5, 5, 4), new Vector3(35, 5, 4))]);
+        Assert.True(stock.Volume() < cut - 100);
+        Assert.Equal(cut, copy.Volume(), 6);
+
+        stock.CopyFrom(copy);
+        foreach (var axis in new[] { DexelAxis.X, DexelAxis.Y, DexelAxis.Z })
+        {
+            DexelAssert.GridsClose(copy.Read(axis), stock.Read(axis), 0);
+        }
+
+        using var other = DexelStock.Box(_compute, Block(40, 20, 11), 0.5f);
+        Assert.Throws<ArgumentException>(() => stock.CopyFrom(other));
+    }
+
+    [Fact]
+    public void SaveLoad_RoundTripsSegmentsAndOverflow()
+    {
+        using var stock = DexelStock.Box(_compute, Block(30, 20, 10), 0.5f, capacity: 2);
+        stock.Remove(CutterProfile.Ball(4, 20), [new ToolMove(new Vector3(2, 10, 6), new Vector3(28, 10, 6))]);
+        stock.Remove(CutterProfile.Flat(3, 20), [new ToolMove(new Vector3(15, 2, 3), new Vector3(15, 18, 3))]);
+        using var buffer = new MemoryStream();
+        stock.Save(buffer);
+        buffer.Position = 0;
+
+        using var loaded = DexelStock.Load(_compute, buffer);
+        Assert.Equal(stock.Bounds, loaded.Bounds);
+        Assert.Equal(stock.Resolution, loaded.Resolution);
+        Assert.Equal(stock.Capacity, loaded.Capacity);
+        Assert.Equal(stock.OverflowCount, loaded.OverflowCount);
+        Assert.Equal(stock.Volume(), loaded.Volume(), 6);
+        foreach (var axis in new[] { DexelAxis.X, DexelAxis.Y, DexelAxis.Z })
+        {
+            DexelAssert.GridsClose(stock.Read(axis), loaded.Read(axis), 0);
+        }
+
+        Assert.Throws<InvalidDataException>(() => DexelStock.Load(_compute, new MemoryStream(new byte[16])));
+    }
+
     internal sealed class FloatComparer(float tolerance) : IEqualityComparer<float>
     {
         public bool Equals(float x, float y) => MathF.Abs(x - y) <= tolerance;

@@ -103,7 +103,12 @@ public sealed class Stock
 public enum KeepOutAttachment
 {
     Machine,
+
+    /// <summary>Moves with the part: setup frame, turns with A (clamps, chuck jaws).</summary>
     Setup,
+
+    /// <summary>Belongs to a setup but stays put when A turns (headstock, tailstock): WCS coordinates of that setup.</summary>
+    SetupFixed,
 }
 
 public sealed class KeepOutZone
@@ -112,7 +117,7 @@ public sealed class KeepOutZone
 
     public KeepOutAttachment Attachment { get; set; }
 
-    /// <summary>Set when <see cref="Attachment"/> is <see cref="KeepOutAttachment.Setup"/>.</summary>
+    /// <summary>Set when <see cref="Attachment"/> is <see cref="KeepOutAttachment.Setup"/> or <see cref="KeepOutAttachment.SetupFixed"/>.</summary>
     public Guid? SetupId { get; set; }
 
     public SimpleSolid Solid { get; set; } = new();

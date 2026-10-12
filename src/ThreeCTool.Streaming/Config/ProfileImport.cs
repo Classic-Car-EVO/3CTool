@@ -29,6 +29,8 @@ public static class ProfileImport
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(config);
         profile.Axes = [.. config.Axes()];
+        profile.JunctionDeviation = config.JunctionDeviation;
+        profile.PlannerBlocks = config.PlannerBlocks;
         profile.Controller.ConfigHash = config.Hash;
         profile.Controller.ConfigImportedAt = importedAt;
         if (version is not null)
@@ -42,6 +44,8 @@ public static class ProfileImport
         ArgumentNullException.ThrowIfNull(profile);
         ArgumentNullException.ThrowIfNull(config);
         var result = new List<ProfileMismatch>();
+        Number(result, null, "junction deviation", profile.JunctionDeviation, config.JunctionDeviation);
+        Value(result, null, "planner blocks", profile.PlannerBlocks, config.PlannerBlocks);
         var controllerAxes = config.Axes();
         foreach (var actual in controllerAxes)
         {
@@ -98,7 +102,7 @@ public static class ProfileImport
         return new ControllerIdentity(build, config, mismatches, warnings);
     }
 
-    private static void Number(List<ProfileMismatch> result, AxisName axis, string name, double expected, double actual)
+    private static void Number(List<ProfileMismatch> result, AxisName? axis, string name, double expected, double actual)
     {
         if (Math.Abs(expected - actual) > RelativeTolerance * Math.Max(1, Math.Max(Math.Abs(expected), Math.Abs(actual))))
         {
@@ -106,7 +110,7 @@ public static class ProfileImport
         }
     }
 
-    private static void Value<T>(List<ProfileMismatch> result, AxisName axis, string name, T expected, T actual)
+    private static void Value<T>(List<ProfileMismatch> result, AxisName? axis, string name, T expected, T actual)
         where T : IEquatable<T>
     {
         if (!expected.Equals(actual))

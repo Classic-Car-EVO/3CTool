@@ -91,6 +91,23 @@ public sealed class ControllerConfigTests
     }
 
     [Fact]
+    public void Apply_ImportsPlannerSettings_AndCompareReportsDrift()
+    {
+        var config = ControllerConfig.Parse(["junction_deviation_mm: 0.02", .. Yaml]);
+        var profile = new MachineProfile { Name = "test" };
+        ProfileImport.Apply(profile, config, null, DateTimeOffset.UnixEpoch);
+        Assert.Equal(0.02, profile.JunctionDeviation);
+        Assert.Equal(32, profile.PlannerBlocks);
+        Assert.Equal(0.01, ControllerConfig.Parse(Yaml).JunctionDeviation);
+
+        profile.JunctionDeviation = 0.05;
+        profile.PlannerBlocks = 16;
+        var mismatches = ProfileImport.Compare(profile, config);
+        Assert.Contains(mismatches, m => m.Axis == null && m.Setting == "junction deviation");
+        Assert.Contains(mismatches, m => m.Axis == null && m.Setting == "planner blocks" && m.ControllerValue == "32");
+    }
+
+    [Fact]
     public async Task IdentifyAsync_AgainstSimulator_MatchesImportedProfile()
     {
         await using var harness = await SimHarness.StartAsync(home: false);
