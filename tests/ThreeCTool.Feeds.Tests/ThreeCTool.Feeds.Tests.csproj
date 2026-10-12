@@ -2,6 +2,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\ThreeCTool.Feeds\ThreeCTool.Feeds.csproj" />
+    <ProjectReference Include="..\..\src\ThreeCTool.Data\ThreeCTool.Data.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

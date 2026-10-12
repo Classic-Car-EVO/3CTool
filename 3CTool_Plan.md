@@ -537,6 +537,29 @@ Progress:
   - Machine keep-outs and absolute travel need the setup's work offset (machine position of the WCS origin at A = 0); without it there is a warning and only the travel span is checked.
   - The spindle collision model is relative to the collet nut face; the dust shoe is not modelled yet (installed frame unknown).
   - Toolpath preview rendering, the layer slider and heatmap display belong to the Desktop UI stage.
+- Feeds and speeds (section 8): `FeedsEngine` plans one tool group (one G-code file):
+  - One RPM for all operations of the tool, in 100 RPM steps over the spindle range. It stays inside the material's surface speed range whenever that is possible for every operation, and is scored by the goal (cutting time, distance from the goal's surface speed, chip load shortfall).
+  - Feed per operation from the nominal engagement of its strategy (roughing: stepdown × stepover; finishing: incoming stock × stepover; waterline and pencil handled separately). Target chip load = table chip load at the tool diameter × goal factor × learned correction × stickout factor (from 3×D), raised for radial chip thinning and ball/bull/cone lead angle (at most 3×).
+  - Limits, in order of what binds: spindle power at that RPM (80 % used, Kienzle specific cutting force), tool tip deflection (stepped shank/flute cantilever; roughing allows a quarter of the radial stock, finishing the tolerance), tool bending stress, machine X/Y feed. The binding limit is reported. Plunge feed is 30 % of the feed, capped by the Z rate.
+  - Warnings: missing or converted (carbide ↔ HSS) cutting data, surface speed out of range, rubbing chip thickness, DOC/WOC above the material limits, depth beyond the flute length or the tool's maximum, unknown stickout.
+
+  Per-move slowdown: `DexelStock.Remove` can measure the removed volume per move (Z dexels, on GPU). The simulator divides it by the path length over a window of at least a quarter tool diameter. Where the removed cross-section exceeds the nominal one by more than 15 %, the move is re-evaluated at the same RPM (wider up to a slot, then deeper) and its feed scaled by 0.05 steps down to 10 %. The factors are in `StepSummary.FeedFactors`, are used for the cycle time and are reported as `FeedReduced` info.
+
+  Learning (`FeedLearning`): one update per streamed file and strategy section, from:
+  - Line-weighted feed overrides, attributed to the sections they were active in.
+  - RPM changes: surface speed follows the RPM ratio and chip load keeps the feed per minute.
+  - Ratings below 3: finish and chatter reduce chip load, wear reduces surface speed.
+  - Wear and breakage events.
+
+  Each signal moves halfway in log scale. Each job changes a factor by at most ±10 %, and factors stay within 0.5–1.5.
+
+  Deviations and limits:
+  - The goal changes chip load and surface speed only. Stepover and stepdown stay the operation's (resolved) settings.
+  - DOC/WOC limits warn but do not change the feed.
+  - Acceleration is left to the simulator's cycle time.
+  - Inverse-time feeds for rotary moves are written by the Post stage.
+  - Viewing and resetting corrections is Desktop UI work.
+  - The default machine now uses the real travel (Z 600) and proprietary collets with a Ø20 × 25 mm nut, and the spindle body starts at the nut.
 8. Nozzle probing on the conductive tool setter (electrical ground path to the nozzle/heater block).
 
 ---

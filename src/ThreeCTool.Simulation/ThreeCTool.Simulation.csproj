@@ -5,6 +5,7 @@
     <ProjectReference Include="..\ThreeCTool.Geometry\ThreeCTool.Geometry.csproj" />
     <ProjectReference Include="..\ThreeCTool.Compute\ThreeCTool.Compute.csproj" />
     <ProjectReference Include="..\ThreeCTool.Toolpaths\ThreeCTool.Toolpaths.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeds\ThreeCTool.Feeds.csproj" />
   </ItemGroup>
 
   <PropertyGroup>

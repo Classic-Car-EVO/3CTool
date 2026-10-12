@@ -4,6 +4,7 @@ using ThreeCTool.Core;
 using ThreeCTool.Core.Machines;
 using ThreeCTool.Core.Materials;
 using ThreeCTool.Core.Projects;
+using ThreeCTool.Feeds;
 using ThreeCTool.Toolpaths;
 
 using Xunit.Abstractions;
@@ -149,6 +150,54 @@ public sealed class SimulatorTests(ComputeFixture fixture, ITestOutputHelper out
         Assert.Equal(1, report.Locate(report.Steps[0].Duration + 1e-3)!.Value.Step);
         Assert.Equal((2, 3), report.Locate(report.CycleTime));
         Assert.Null(report.Locate(report.CycleTime + 1));
+    }
+
+    [Fact]
+    public void EngagementLimiter_SlowsTheSlot_AndKeepsNominalPasses()
+    {
+        var material = new Material
+        {
+            Name = "aluminium",
+            SpecificCuttingForce = 700,
+            KienzleExponent = 0.23,
+            CuttingData = [new CuttingData { SurfaceSpeedMin = 150, SurfaceSpeedMax = 400, ChipLoad = [new ChipLoadPoint { Diameter = 6, ChipLoad = 0.04 }] }],
+        };
+        var tool = Flat();
+        var engine = new FeedsEngine(new FeedContext { Machine = Machine(), Material = material });
+        var feeds = engine.Plan([new FeedRequest { Strategy = StrategyType.AdaptiveRoughing, Tool = tool, Stepover = 1.5, Stepdown = 3, Tolerance = 0.05, RadialStock = 0.5 }]).Operations[0];
+        MillingStep Limited(string name, double y, bool limit = true) => new()
+        {
+            Name = name,
+            SetupId = SetupId,
+            Tool = tool,
+            Collet = Collet(),
+            Conditions = feeds.ToConditions(),
+            Limiter = limit ? feeds.Limiter : null,
+            Toolpath = new Toolpath { Frame = SetupFrame.Identity, Moves = [.. Slot(5, 35, y, 7)] },
+        };
+
+        // Ray centres at 0.125 + k·0.25 put the 6 mm slot and the 1.5 mm side pass exactly on whole rows.
+        var job = Job(fixture.Compute, Box(StockMin, new Vector3(40, 20, 5)), BoxStock(StockMin, StockMax), [Limited("slot", 10), Limited("side", 11.5)], o => o.Resolution = 0.25f);
+        using var result = Run(job);
+        var report = result.Report;
+
+        Assert.Empty(report.Errors());
+        var slot = report.Steps[0].FeedFactors;
+        var side = report.Steps[1].FeedFactors;
+        Assert.Equal(4, slot.Length);
+        Assert.InRange(slot[2], 0.1f, 0.95f);
+        Assert.Equal(1f, slot[1]);
+        Assert.Equal(1f, side[2]);
+        var issue = Assert.Single(report.Issues, i => i.Kind == IssueKind.FeedReduced);
+        Assert.Equal((report.Steps[0].StepId, 2, 2), (issue.StepId!.Value, issue.FirstMove, issue.LastMove));
+
+        // The slowed cut takes longer, at most 1 / factor as long (acceleration ramps take the same time or less).
+        var nominal = Limited("slot", 10, limit: false);
+        using var plain = Run(Job(fixture.Compute, Box(StockMin, new Vector3(40, 20, 5)), BoxStock(StockMin, StockMax), [nominal], o => o.Resolution = 0.25f));
+        var slowed = report.Steps[0].MoveEndTimes[2] - report.Steps[0].MoveEndTimes[1];
+        var fast = plain.Report.Steps[0].MoveEndTimes[2] - plain.Report.Steps[0].MoveEndTimes[1];
+        Assert.InRange(slowed / fast, 1.03, (1 / slot[2]) + 1e-6);
+        Assert.All(plain.Report.Steps[0].FeedFactors, f => Assert.Equal(1f, f));
     }
 
     [Fact]

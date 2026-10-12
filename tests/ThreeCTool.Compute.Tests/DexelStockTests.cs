@@ -386,6 +386,39 @@ public class DexelStockTests(CpuComputeFixture fixture) : IClassFixture<CpuCompu
         Assert.Throws<InvalidDataException>(() => DexelStock.Load(_compute, new MemoryStream(new byte[16])));
     }
 
+    [Fact]
+    public void Remove_MeasuresVolumePerMove()
+    {
+        using var stock = DexelStock.Box(_compute, Block(60, 30, 10), 0.2f);
+        var cutter = CutterProfile.Flat(6, 20);
+        var before = stock.Volume();
+        ToolMove[] slot =
+        [
+            new(new Vector3(10, 10, 7), new Vector3(20, 10, 7)),
+            new(new Vector3(20, 10, 7), new Vector3(40, 10, 7)),
+            new(new Vector3(40, 10, 7), new Vector3(20, 10, 7)),
+        ];
+        var removed = new double[slot.Length];
+        stock.Remove(cutter, slot, removed);
+
+        Assert.Equal((Math.PI * 9 * 3) + (10 * 6 * 3), removed[0], 0.03 * removed[0]);
+        Assert.Equal(20 * 6 * 3, removed[1], 0.02 * removed[1]);
+        Assert.Equal(0, removed[2], 1e-9);
+        Assert.Equal(before - stock.Volume(), removed.Sum(), 0.01 * removed.Sum());
+
+        // Half-width pass beside the slot: steady state removes 3 mm × 3 mm per mm of travel (± one row of rays).
+        ToolMove[] side =
+        [
+            new(new Vector3(10, 13, 7), new Vector3(20, 13, 7)),
+            new(new Vector3(20, 13, 7), new Vector3(40, 13, 7)),
+        ];
+        removed = new double[side.Length];
+        stock.Remove(cutter, side, removed);
+        Assert.Equal(20 * 3 * 3, removed[1], 0.2 * 20 * 3);
+
+        Assert.Throws<ArgumentException>(() => stock.Remove(cutter, side, new double[1]));
+    }
+
     internal sealed class FloatComparer(float tolerance) : IEqualityComparer<float>
     {
         public bool Equals(float x, float y) => MathF.Abs(x - y) <= tolerance;

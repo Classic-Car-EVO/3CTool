@@ -230,14 +230,25 @@ public sealed class DexelStock : IDisposable
     }
 
     /// <summary>Removes the material swept by <paramref name="cutter"/> along <paramref name="moves"/>.</summary>
-    public void Remove(CutterProfile cutter, ReadOnlySpan<ToolMove> moves)
+    public void Remove(CutterProfile cutter, ReadOnlySpan<ToolMove> moves) => Remove(cutter, moves, []);
+
+    /// <summary>
+    /// Removes the material swept along <paramref name="moves"/> and adds the volume each move removed (mm³, measured
+    /// on the Z rays in move order) to <paramref name="removed"/>; an empty span skips the measurement.
+    /// </summary>
+    public void Remove(CutterProfile cutter, ReadOnlySpan<ToolMove> moves, Span<double> removed)
     {
         if (cutter.Height <= 0)
         {
             throw new ArgumentException("The cutter needs a cutting height for material removal.", nameof(cutter));
         }
 
-        Sweep(cutter, moves, 0, add: false);
+        if (!removed.IsEmpty && removed.Length != moves.Length)
+        {
+            throw new ArgumentException("Need one volume entry per move.", nameof(removed));
+        }
+
+        Sweep(cutter, moves, 0, add: false, removed);
     }
 
     /// <summary>
@@ -248,7 +259,7 @@ public sealed class DexelStock : IDisposable
     {
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(width);
         ArgumentOutOfRangeException.ThrowIfNegativeOrZero(height);
-        Sweep(CutterProfile.Flat(width, height), moves, height, add: true);
+        Sweep(CutterProfile.Flat(width, height), moves, height, add: true, []);
     }
 
     public DexelGrid Read(DexelAxis axis)
@@ -506,12 +517,14 @@ public sealed class DexelStock : IDisposable
         }
     }
 
-    private void Sweep(CutterProfile cutter, ReadOnlySpan<ToolMove> moves, float tipOffset, bool add)
+    private void Sweep(CutterProfile cutter, ReadOnlySpan<ToolMove> moves, float tipOffset, bool add, Span<double> removed)
     {
         var data = new List<Float3>(moves.Length * 5);
         var boxes = new List<(Vector3 Min, Vector3 Max)>(moves.Length);
-        foreach (var move in moves)
+        var owners = new List<int>(moves.Length);
+        for (var index = 0; index < moves.Length; index++)
         {
+            var move = moves[index];
             var axis = Vector3.Normalize(move.Axis);
             if (!float.IsFinite(axis.X) || !float.IsFinite(axis.Y) || !float.IsFinite(axis.Z))
             {
@@ -542,6 +555,7 @@ public sealed class DexelStock : IDisposable
                     data.Add(Float3.From(min));
                     data.Add(Float3.From(max));
                     boxes.Add((min, max));
+                    owners.Add(index);
                 }
             }
         }
@@ -552,10 +566,17 @@ public sealed class DexelStock : IDisposable
         }
 
         var moveData = data.ToArray();
+        var measure = !removed.IsEmpty;
+
+        // Units of 1/1024 dexel spacing: integer sums stay exact enough and far from overflow.
+        var scale = 1024 / Resolution;
+        var totals = new long[measure ? boxes.Count : 1];
         lock (Compute.Gate)
         {
             using var moveBuffer = Compute.Accelerator.Allocate1D<Float3>(moveData.Length);
             Compute.Upload(moveBuffer.View, moveData);
+            using var removedBuffer = Compute.Accelerator.Allocate1D<long>(totals.Length);
+            removedBuffer.MemSetToZero();
             var kernel = Compute.Kernel<DexelSweepArgs>(DexelKernel.Sweep);
             foreach (var grid in _grids)
             {
@@ -576,9 +597,25 @@ public sealed class DexelStock : IDisposable
                         ForceGeneral = ForceGeneralSolver ? 1 : 0,
                         MinLength = Resolution * 1e-3f,
                         Overflow = _overflow.View,
+                        Removed = removedBuffer.View,
+                        MeasureScale = measure && grid.Axis == (int)DexelAxis.Z ? scale : 0,
                     });
                     Compute.Accelerator.Synchronize();
                 }
+            }
+
+            if (measure)
+            {
+                Compute.Download(removedBuffer.View, totals);
+            }
+        }
+
+        if (measure)
+        {
+            var area = (double)Resolution * Resolution / scale;
+            for (var i = 0; i < totals.Length; i++)
+            {
+                removed[owners[i]] += totals[i] * area;
             }
         }
     }

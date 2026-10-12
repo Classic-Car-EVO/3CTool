@@ -31,8 +31,16 @@ public class DexelStockGpuTests(GpuAndCpuFixture fixture, ITestOutputHelper outp
         using var gpu = DexelStock.Box(fixture.Gpu, Block, 0.5f);
         using var cpu = DexelStock.Box(fixture.Cpu, Block, 0.5f);
         var cutter = CutterProfile.BullNose(6, 1, 15);
-        gpu.Remove(cutter, moves);
-        cpu.Remove(cutter, moves);
+        var gpuRemoved = new double[moves.Length];
+        var cpuRemoved = new double[moves.Length];
+        gpu.Remove(cutter, moves, gpuRemoved);
+        cpu.Remove(cutter, moves, cpuRemoved);
+        for (var i = 0; i < moves.Length; i++)
+        {
+            Assert.Equal(cpuRemoved[i], gpuRemoved[i], 0.05 + (1e-3 * cpuRemoved[i]));
+        }
+
+        Assert.True(cpuRemoved.Sum() > 100);
         gpu.Deposit(moves.AsSpan(0, 5), 0.6f, 0.3f);
         cpu.Deposit(moves.AsSpan(0, 5), 0.6f, 0.3f);
         foreach (var dexelAxis in new[] { DexelAxis.Z, DexelAxis.X, DexelAxis.Y })

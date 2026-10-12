@@ -75,6 +75,9 @@ public static class Simulator
         private readonly int _totalSegments;
         private int _doneSegments;
 
+        /// <summary>Removed volume (mm³) per move of the current milling step when it has an engagement limiter.</summary>
+        private double[]? _removed;
+
         public SimulationRun(SimulationJob job, List<PreparedStep> steps, DexelStock stock, float resolution, IProgress<double>? progress, CancellationToken token)
         {
             _job = job;
@@ -159,6 +162,7 @@ public static class Simulator
                 Add(new VerificationIssue(IssueKind.MissingData, IssueSeverity.Warning, step.Id, -1, -1, null, null, note));
             }
 
+            _removed = step is MillingStep { Limiter: not null } milling ? new double[milling.Toolpath.Moves.Count] : null;
             var before = _stock.Volume();
             var stockHits = StockPass(p, body);
             var volumeChange = _stock.Volume() - before;
@@ -229,7 +233,7 @@ public static class Simulator
                         var candidates = Candidates(TestStock(_stock, p, body, poses), poses);
                         if (candidates.Count == 0)
                         {
-                            p.Apply(_stock, CollectionsMarshal.AsSpan(segments)[start..end]);
+                            p.Apply(_stock, CollectionsMarshal.AsSpan(segments)[start..end], _removed);
                         }
                         else
                         {
@@ -275,7 +279,7 @@ public static class Simulator
             var pending = start;
             foreach (var group in candidates.GroupBy(c => c.Segment).OrderBy(g => g.Key))
             {
-                p.Apply(scratch, CollectionsMarshal.AsSpan(segments)[pending..group.Key]);
+                p.Apply(scratch, CollectionsMarshal.AsSpan(segments)[pending..group.Key], Measured(p));
                 var segment = segments[group.Key];
                 var sorted = group.OrderBy(c => c.T).ToList();
                 var bucketSize = (sorted.Count + maxBuckets - 1) / maxBuckets;
@@ -285,7 +289,7 @@ public static class Simulator
                     var bucket = sorted.GetRange(b, Math.Min(bucketSize, sorted.Count - b));
                     if (segment.Active && bucket[0].T > applied)
                     {
-                        p.Apply(scratch, [PreparedStep.Partial(segment, applied, bucket[0].T)]);
+                        p.Apply(scratch, [PreparedStep.Partial(segment, applied, bucket[0].T)], Measured(p));
                         applied = bucket[0].T;
                     }
 
@@ -301,15 +305,18 @@ public static class Simulator
 
                 if (segment.Active && applied < 1)
                 {
-                    p.Apply(scratch, [PreparedStep.Partial(segment, applied, 1)]);
+                    p.Apply(scratch, [PreparedStep.Partial(segment, applied, 1)], Measured(p));
                 }
 
                 pending = group.Key + 1;
             }
 
-            p.Apply(scratch, CollectionsMarshal.AsSpan(segments)[pending..end]);
+            p.Apply(scratch, CollectionsMarshal.AsSpan(segments)[pending..end], Measured(p));
             return confirmed;
         }
+
+        /// <summary>Removal is measured while replaying milling chunks (deposits are replayed on a snapshot).</summary>
+        private double[]? Measured(PreparedStep p) => p.IsMilling ? _removed : null;
 
         private ulong[] TestStock(DexelStock target, PreparedStep p, CollisionBody body, IReadOnlyList<PoseRef> poses) =>
             TestPoses(p, body, poses, wcs: false, alwaysFull: false, (primitives, array) => CollisionSweep.AgainstStock(target, primitives, array, _options.CollisionClearance));
@@ -611,6 +618,7 @@ public static class Simulator
             var positions = Positions(step);
             var blocks = new List<MotionBlock>(Math.Max(positions.Count - 1, 0));
             double filamentLength = 0, filamentMass = 0;
+            float[] factors = [];
             if (step is MillingStep milling)
             {
                 var feed = milling.Conditions?.FeedRate > 0 ? milling.Conditions.FeedRate : _options.DefaultFeed;
@@ -622,10 +630,11 @@ public static class Simulator
                 }
 
                 var moves = milling.Toolpath.Moves;
+                factors = FeedFactors(p, milling);
                 for (var i = 1; i < moves.Count; i++)
                 {
                     var m = moves[i];
-                    var f = m.Kind == MoveKind.Plunge ? plunge : feed;
+                    var f = (m.Kind == MoveKind.Plunge ? plunge : feed) * factors[i];
                     var rapid = m.Kind == MoveKind.Rapid;
                     var inverse = !rapid && milling.Toolpath.UsesRotary && m.A != moves[i - 1].A;
                     if (inverse)
@@ -678,10 +687,89 @@ public static class Simulator
                 Name = step.Name,
                 Duration = times[^1],
                 MoveEndTimes = times,
+                FeedFactors = factors,
                 VolumeChange = volumeChange,
                 FilamentLength = filamentLength,
                 FilamentMass = filamentMass,
             };
+        }
+
+        /// <summary>
+        /// Per move, the engagement limiter's feed factor for the removed cross-section (volume / length) over a
+        /// window of contiguous cutting moves around it at least a quarter tool diameter long; rapids and plunges
+        /// keep 1.
+        /// </summary>
+        private float[] FeedFactors(PreparedStep p, MillingStep milling)
+        {
+            var moves = milling.Toolpath.Moves;
+            var factors = new float[moves.Count];
+            Array.Fill(factors, 1f);
+            if (milling.Limiter is not { } limiter || _removed is not { } removed)
+            {
+                return factors;
+            }
+
+            var length = new double[moves.Count];
+            foreach (var s in p.Segments)
+            {
+                length[s.Source] += Vector3.Distance(s.Move.From, s.Move.To);
+            }
+
+            var window = Math.Max(0.25 * milling.Tool.Diameter, 4 * _resolution);
+            bool Cutting(int i) => i >= 1 && i < moves.Count && moves[i].Kind is not (MoveKind.Rapid or MoveKind.Plunge);
+            int slowed = 0, first = -1, last = -1;
+            double heaviest = 0;
+            for (var i = 1; i < moves.Count; i++)
+            {
+                if (!Cutting(i))
+                {
+                    continue;
+                }
+
+                double volume = removed[i], total = length[i];
+                int low = i, high = i;
+                while (total < window)
+                {
+                    var grown = false;
+                    if (Cutting(low - 1))
+                    {
+                        low--;
+                        volume += removed[low];
+                        total += length[low];
+                        grown = true;
+                    }
+
+                    if (total < window && Cutting(high + 1))
+                    {
+                        high++;
+                        volume += removed[high];
+                        total += length[high];
+                        grown = true;
+                    }
+
+                    if (!grown)
+                    {
+                        break;
+                    }
+                }
+
+                factors[i] = total > 1e-9 ? (float)limiter.Factor(volume / total) : 1f;
+                if (factors[i] < 1)
+                {
+                    slowed++;
+                    first = first < 0 ? i : first;
+                    last = i;
+                    heaviest = Math.Max(heaviest, volume / total);
+                }
+            }
+
+            if (slowed > 0)
+            {
+                Add(new VerificationIssue(IssueKind.FeedReduced, IssueSeverity.Info, milling.Id, first, last, null, null,
+                    $"{slowed} moves of '{milling.Name}' cut more than the nominal {limiter.NominalArea:0.##} mm² (up to {heaviest:0.##} mm²) and run at down to {factors.Min():P0} feed."));
+            }
+
+            return factors;
         }
 
         // ---- Deviation and gouges ----

@@ -5,6 +5,7 @@ using ThreeCTool.Core.Machines;
 using ThreeCTool.Core.Materials;
 using ThreeCTool.Core.Projects;
 using ThreeCTool.Core.Tooling;
+using ThreeCTool.Feeds;
 using ThreeCTool.Geometry;
 using ThreeCTool.Toolpaths;
 
@@ -102,6 +103,9 @@ public sealed class MillingStep : SimulationStep
     public Collet? Collet { get; init; }
 
     public CuttingConditions? Conditions { get; init; }
+
+    /// <summary>Slows moves that cut more than the nominal engagement; null keeps every feed nominal.</summary>
+    public EngagementLimiter? Limiter { get; init; }
 }
 
 public enum PrintMoveKind : byte
