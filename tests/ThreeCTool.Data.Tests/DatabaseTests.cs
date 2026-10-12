@@ -78,7 +78,12 @@ public sealed class DatabaseTests : IDisposable
         Assert.Equal(OperatorConfirmations.HeadMounted | OperatorConfirmations.CutterRemoved, fdm.RequiredConfirmations);
         Assert.NotNull(fdm.Fdm);
         Assert.Equal(4, fdm.CollisionModel.Count);
-        Assert.All(machine.Collets, c => Assert.Equal(2, c.Holder.Count));
+        Assert.Equal(600, machine.GetAxis(AxisName.Z)!.MaxTravel);
+        var spindle = Assert.Single(machine.Toolheads.Single(t => t.Type == ToolheadType.Spindle).CollisionModel);
+        Assert.Equal((37.5, 25.0, 50.0), (spindle.Radius, spindle.BottomZ, spindle.Height));
+        Assert.Equal(4, machine.Collets.Count);
+        Assert.All(machine.Collets, c => Assert.Equal((20.0, 25.0), (Assert.Single(c.Holder).Diameter, c.Holder[0].Length)));
+        Assert.Equal(8, machine.Collets.Max(c => c.ShankDiameter));
     }
 
     [Fact]
