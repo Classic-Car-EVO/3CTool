@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ThreeCTool.Feeder.Service\ThreeCTool.Feeder.Service.csproj" />
+    <ProjectReference Include="..\..\src\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+    <ProjectReference Include="..\ThreeCTool.FluidNcSimulator\ThreeCTool.FluidNcSimulator.csproj" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <AssemblyName>3ctool-feederd</AssemblyName>
+    <RootNamespace>ThreeCTool.Feeder.Service</RootNamespace>
+    <InvariantGlobalization>true</InvariantGlobalization>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Grpc.AspNetCore" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Systemd" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThreeCTool.Core\ThreeCTool.Core.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Streaming\ThreeCTool.Streaming.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ThreeCTool.Feeder.Tests" />
+  </ItemGroup>
+
+</Project>
