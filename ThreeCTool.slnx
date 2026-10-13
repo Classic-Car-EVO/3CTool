@@ -24,6 +24,7 @@
     <Project Path="tests/ThreeCTool.Core.Tests/ThreeCTool.Core.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Cutting.Tests/ThreeCTool.Cutting.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Data.Tests/ThreeCTool.Data.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Desktop.Tests/ThreeCTool.Desktop.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Feeder.Tests/ThreeCTool.Feeder.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Feeds.Tests/ThreeCTool.Feeds.Tests.csproj" />
     <Project Path="tests/ThreeCTool.FluidNcSimulator/ThreeCTool.FluidNcSimulator.csproj" />
