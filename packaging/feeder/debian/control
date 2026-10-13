@@ -1,0 +1,16 @@
+Package: 3ctool-feeder
+Version: @VERSION@
+Architecture: @ARCH@
+Maintainer: @MAINTAINER@
+Installed-Size: @SIZE@
+Section: misc
+Priority: optional
+Depends: adduser, libc6, libgcc-s1, libstdc++6, zlib1g, libssl3 | libssl3t64, libfontconfig1, libdrm2, libgbm1, libegl1, libgles2, libinput10, libudev1
+Description: 3C Tool feeder for FluidNC mills
+ Runs on the Raspberry Pi next to the mill: stores jobs uploaded from the
+ 3C Tool desktop, streams them to the FluidNC controller, journals every run
+ for crash recovery and collects operator feedback for feed learning.
+ .
+ Includes the feeder daemon (3ctool-feederd, gRPC over TLS for paired
+ desktops) and the touch screen UI (3ctool-feeder-ui), which starts full
+ screen on the DRM console.

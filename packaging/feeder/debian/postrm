@@ -1,0 +1,16 @@
+#!/bin/sh
+set -e
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null 2>&1 || true
+fi
+
+# Purge removes the jobs, run journal, feedback, pairings and the TLS certificate.
+if [ "$1" = purge ]; then
+    rm -rf /var/lib/3ctool-feeder /etc/3ctool-feeder
+    if getent passwd 3ctool-feeder >/dev/null; then
+        deluser --system 3ctool-feeder >/dev/null 2>&1 || true
+    fi
+fi
+
+exit 0

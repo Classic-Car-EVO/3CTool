@@ -1,0 +1,19 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             x:Class="ThreeCTool.Feeder.Views.ConfirmView"
+             x:DataType="vm:ConfirmViewModel">
+  <Border Classes="dialog" MinWidth="460">
+    <Grid RowDefinitions="Auto,*,Auto">
+      <TextBlock Text="{Binding Title}" Classes="title" />
+      <ScrollViewer Grid.Row="1" Margin="0,8">
+        <TextBlock Text="{Binding Message}" TextWrapping="Wrap" FontSize="17" />
+      </ScrollViewer>
+      <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="Cancel" Command="{Binding CancelCommand}" MinWidth="120" />
+        <Button Name="Accept" Content="{Binding ConfirmText}" Command="{Binding AcceptCommand}" MinWidth="140"
+                Classes="primary" Classes.danger="{Binding Danger}" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

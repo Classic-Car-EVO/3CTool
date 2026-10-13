@@ -1,0 +1,15 @@
+{
+  "Feeder": {
+    "DataDirectory": "/var/lib/3ctool-feeder",
+    "Port": 50051,
+    "UnixSocketPath": "/run/3ctool-feeder/feeder.sock",
+    "RotaryRadiusMm": 20,
+    "RapidRateMmPerMin": 5000
+  },
+  "Logging": {
+    "LogLevel": {
+      "Default": "Information",
+      "Microsoft.AspNetCore": "Warning"
+    }
+  }
+}

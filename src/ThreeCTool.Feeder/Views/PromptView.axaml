@@ -1,0 +1,26 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             x:Class="ThreeCTool.Feeder.Views.PromptView"
+             x:DataType="vm:PromptViewModel">
+  <Border Classes="dialog" MinWidth="520" BorderBrush="{StaticResource WarningBrush}" BorderThickness="2">
+    <Grid RowDefinitions="Auto,*,Auto,Auto">
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding Title}" Classes="title" />
+        <TextBlock Grid.Column="1" Text="{Binding LineText}" Classes="label" VerticalAlignment="Center" />
+      </Grid>
+      <ScrollViewer Grid.Row="1" Margin="0,8">
+        <TextBlock Name="Message" Text="{Binding Message}" TextWrapping="Wrap" FontSize="19" />
+      </ScrollViewer>
+      <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto" IsVisible="{Binding IsSpindle}" Margin="0,0,0,8">
+        <TextBlock Text="Dial RPM" Classes="label" VerticalAlignment="Center" Margin="0,0,12,0" />
+        <TextBlock Grid.Column="1" Text="{Binding RpmText}" FontSize="24" VerticalAlignment="Center" />
+        <Button Grid.Column="2" Name="EditRpm" Content="Change..." Command="{Binding EditRpmCommand}" />
+      </Grid>
+      <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Content="Cancel job step" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" Classes="danger" />
+        <Button Name="Confirm" Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}" Classes="primary" MinWidth="180" MinHeight="60" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

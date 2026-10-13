@@ -1,15 +1,103 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             xmlns:views="using:ThreeCTool.Feeder.Views"
              x:Class="ThreeCTool.Feeder.App"
-             xmlns:local="using:ThreeCTool.Feeder"
-             RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
+             RequestedThemeVariant="Dark">
 
-    <Application.DataTemplates>
-        <local:ViewLocator />
-    </Application.DataTemplates>
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:KeyboardViewModel"><views:KeyboardView /></DataTemplate>
+    <DataTemplate DataType="vm:ConfirmViewModel"><views:ConfirmView /></DataTemplate>
+    <DataTemplate DataType="vm:PromptViewModel"><views:PromptView /></DataTemplate>
+    <DataTemplate DataType="vm:RecoveryViewModel"><views:RecoveryView /></DataTemplate>
+    <DataTemplate DataType="vm:FeedbackViewModel"><views:FeedbackView /></DataTemplate>
+  </Application.DataTemplates>
 
-    <Application.Styles>
-        <FluentTheme />
-    </Application.Styles>
+  <Application.Resources>
+    <SolidColorBrush x:Key="PanelBrush" Color="#1E2226" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#2E7DD7" />
+    <SolidColorBrush x:Key="DangerBrush" Color="#C62828" />
+    <SolidColorBrush x:Key="WarningBrush" Color="#E0A000" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#9AA4AE" />
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <!-- Large touch targets (7" 800x480 panel). -->
+    <Style Selector="Button">
+      <Setter Property="MinHeight" Value="48" />
+      <Setter Property="MinWidth" Value="56" />
+      <Setter Property="FontSize" Value="17" />
+      <Setter Property="Padding" Value="12,6" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="CornerRadius" Value="6" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.selected">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.jog">
+      <Setter Property="MinWidth" Value="68" />
+      <Setter Property="MinHeight" Value="62" />
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="Button.key">
+      <Setter Property="MinWidth" Value="58" />
+      <Setter Property="MinHeight" Value="50" />
+      <Setter Property="Margin" Value="2" />
+      <Setter Property="FontSize" Value="20" />
+    </Style>
+    <Style Selector="ToggleSwitch">
+      <Setter Property="FontSize" Value="17" />
+    </Style>
+    <Style Selector="TabItem">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="MinHeight" Value="44" />
+      <Setter Property="Padding" Value="16,0" />
+    </Style>
+    <Style Selector="TextBlock.label">
+      <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+      <Setter Property="FontSize" Value="14" />
+    </Style>
+    <Style Selector="TextBlock.value">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontFamily" Value="monospace" />
+    </Style>
+    <Style Selector="TextBlock.title">
+      <Setter Property="FontSize" Value="22" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="18" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,12,0,4" />
+    </Style>
+    <Style Selector="Border.panel">
+      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+      <Setter Property="CornerRadius" Value="8" />
+      <Setter Property="Padding" Value="12" />
+    </Style>
+    <Style Selector="Border.dialog">
+      <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+      <Setter Property="BorderBrush" Value="#3A4048" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="10" />
+      <Setter Property="Padding" Value="16" />
+      <Setter Property="HorizontalAlignment" Value="Center" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="MaxWidth" Value="760" />
+      <Setter Property="MaxHeight" Value="460" />
+    </Style>
+  </Application.Styles>
 </Application>

@@ -7,6 +7,7 @@
     <Project Path="src/ThreeCTool.Data/ThreeCTool.Data.csproj" />
     <Project Path="src/ThreeCTool.Desktop/ThreeCTool.Desktop.csproj" />
     <Project Path="src/ThreeCTool.Feeder.Contracts/ThreeCTool.Feeder.Contracts.csproj" />
+    <Project Path="src/ThreeCTool.Feeder.Service/ThreeCTool.Feeder.Service.csproj" />
     <Project Path="src/ThreeCTool.Feeder/ThreeCTool.Feeder.csproj" />
     <Project Path="src/ThreeCTool.Feeds/ThreeCTool.Feeds.csproj" />
     <Project Path="src/ThreeCTool.Geometry/ThreeCTool.Geometry.csproj" />
@@ -23,12 +24,14 @@
     <Project Path="tests/ThreeCTool.Core.Tests/ThreeCTool.Core.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Cutting.Tests/ThreeCTool.Cutting.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Data.Tests/ThreeCTool.Data.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Feeder.Tests/ThreeCTool.Feeder.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Feeds.Tests/ThreeCTool.Feeds.Tests.csproj" />
     <Project Path="tests/ThreeCTool.FluidNcSimulator/ThreeCTool.FluidNcSimulator.csproj" />
     <Project Path="tests/ThreeCTool.Geometry.Tests/ThreeCTool.Geometry.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Gpu.Tests/ThreeCTool.Gpu.Tests.csproj" />
     <Project Path="tests/ThreeCTool.MoonrakerMock/ThreeCTool.MoonrakerMock.csproj" />
     <Project Path="tests/ThreeCTool.Post.Tests/ThreeCTool.Post.Tests.csproj" />
+    <Project Path="tests/ThreeCTool.Rendering.Tests/ThreeCTool.Rendering.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Simulation.Tests/ThreeCTool.Simulation.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Streaming.Tests/ThreeCTool.Streaming.Tests.csproj" />
     <Project Path="tests/ThreeCTool.Thermal.Tests/ThreeCTool.Thermal.Tests.csproj" />

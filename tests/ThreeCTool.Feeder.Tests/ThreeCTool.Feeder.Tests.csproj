@@ -1,0 +1,22 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\src\ThreeCTool.Feeder.Service\ThreeCTool.Feeder.Service.csproj" />
+    <ProjectReference Include="..\..\src\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+    <ProjectReference Include="..\..\src\ThreeCTool.Desktop\ThreeCTool.Desktop.csproj" />
+    <ProjectReference Include="..\..\src\ThreeCTool.Feeder\ThreeCTool.Feeder.csproj" />
+    <ProjectReference Include="..\ThreeCTool.FluidNcSimulator\ThreeCTool.FluidNcSimulator.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+</Project>

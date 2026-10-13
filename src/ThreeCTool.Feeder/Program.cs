@@ -1,18 +1,33 @@
-﻿using Avalonia;
-using System;
+using Avalonia;
 
 namespace ThreeCTool.Feeder;
 
-sealed class Program
+internal static class Program
 {
-    // Initialization code. Don't use any Avalonia, third-party APIs or any
-    // SynchronizationContext-reliant code before AppMain is called: things aren't initialized
-    // yet and stuff might break.
+    // Don't use Avalonia or anything relying on a SynchronizationContext before AppMain is called.
     [STAThread]
-    public static void Main(string[] args) => BuildAvaloniaApp()
-        .StartWithClassicDesktopLifetime(args);
+    public static int Main(string[] args)
+    {
+        FeederUiOptions options;
+        try
+        {
+            options = FeederUiOptions.Parse(args);
+        }
+        catch (ArgumentException ex)
+        {
+            Console.Error.WriteLine(ex.Message);
+            Console.Error.WriteLine(FeederUiOptions.Usage);
+            return 2;
+        }
 
-    // Avalonia configuration, don't remove; also used by visual designer.
+        App.Options = options;
+        var builder = BuildAvaloniaApp();
+        return options.Drm
+            ? builder.StartLinuxDrm(args, options.DrmCard, options.Scaling)
+            : builder.StartWithClassicDesktopLifetime(args);
+    }
+
+    // Also used by the visual designer.
     public static AppBuilder BuildAvaloniaApp()
         => AppBuilder.Configure<App>()
             .UsePlatformDetect()

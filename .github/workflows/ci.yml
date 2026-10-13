@@ -32,4 +32,9 @@ jobs:
       - uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
-      - run: dotnet publish src/ThreeCTool.Feeder/ThreeCTool.Feeder.csproj -c Release -r linux-arm64 --self-contained -o out/feeder
+      - run: packaging/feeder/build-deb.sh "0.1.0~ci${{ github.run_number }}" linux-arm64
+      - uses: actions/upload-artifact@v4
+        with:
+          name: 3ctool-feeder-arm64-deb
+          path: artifacts/*.deb
+          if-no-files-found: error

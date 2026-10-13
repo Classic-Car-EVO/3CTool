@@ -1,0 +1,22 @@
+[Unit]
+Description=3C Tool feeder touch screen (DRM kiosk)
+Wants=3ctool-feederd.service
+After=3ctool-feederd.service systemd-user-sessions.service getty@tty1.service
+# The UI takes over the console display.
+Conflicts=getty@tty1.service
+
+[Service]
+Type=simple
+User=3ctool-feeder
+Group=3ctool-feeder
+# DRM/KMS display, GPU and touch input.
+SupplementaryGroups=video render input
+ExecStart=/usr/bin/3ctool-feeder-ui --drm
+Environment=HOME=/var/lib/3ctool-feeder DOTNET_gcServer=0
+Restart=always
+RestartSec=2
+NoNewPrivileges=yes
+ProtectHome=yes
+
+[Install]
+WantedBy=multi-user.target

@@ -1,0 +1,21 @@
+#!/bin/sh
+set -e
+
+if [ "$1" = configure ]; then
+    if ! getent passwd 3ctool-feeder >/dev/null; then
+        adduser --system --group --home /var/lib/3ctool-feeder --no-create-home \
+            --gecos "3C Tool feeder" 3ctool-feeder >/dev/null
+    fi
+fi
+
+if [ -d /run/systemd/system ]; then
+    systemctl daemon-reload >/dev/null || true
+    if [ "$1" = configure ]; then
+        systemctl enable 3ctool-feederd.service 3ctool-feeder-ui.service >/dev/null || true
+        # On upgrade a running job is stopped; it shows up as recoverable after the restart.
+        systemctl restart 3ctool-feederd.service || true
+        systemctl restart 3ctool-feeder-ui.service || true
+    fi
+fi
+
+exit 0

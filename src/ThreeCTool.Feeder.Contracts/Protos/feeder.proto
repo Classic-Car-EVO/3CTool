@@ -1,0 +1,464 @@
+syntax = "proto3";
+
+package threectool.feeder.v1;
+
+option csharp_namespace = "ThreeCTool.Feeder.Contracts";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Unauthenticated: identifies the feeder and exchanges a one-time pairing code for a token (section 11.5).
+service Pairing {
+  rpc Hello(google.protobuf.Empty) returns (FeederInfo);
+  rpc Pair(PairRequest) returns (PairReply);
+}
+
+// Desktop (TLS + bearer token) and the local touch UI (Unix socket).
+service Feeder {
+  rpc GetInfo(google.protobuf.Empty) returns (FeederInfo);
+
+  // Jobs
+  rpc UploadJob(stream UploadChunk) returns (JobInfo);
+  rpc ListJobs(google.protobuf.Empty) returns (JobList);
+  rpc DeleteJob(JobRef) returns (google.protobuf.Empty);
+  rpc GetPreview(JobRef) returns (Preview);
+
+  // Job control
+  rpc StartJob(StartJobRequest) returns (StartJobReply);
+  rpc Pause(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Resume(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Stop(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc SetFeedOverride(FeedOverrideRequest) returns (google.protobuf.Empty);
+  rpc SetSpindleRpm(SpindleRpmRequest) returns (google.protobuf.Empty);
+  rpc GetRecoveryPlan(google.protobuf.Empty) returns (RecoveryPlanInfo);
+  rpc StartRecovery(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc DiscardRecovery(google.protobuf.Empty) returns (google.protobuf.Empty);
+
+  // Operator prompts are answered at the machine only (local touch UI).
+  rpc AnswerPrompt(PromptAnswer) returns (google.protobuf.Empty);
+
+  // Manual machine control (rejected while a job is active)
+  rpc Jog(JogRequest) returns (google.protobuf.Empty);
+  // Jogs while the stream is open; the jog is cancelled when the stream ends or no message arrives within the keep-alive timeout.
+  rpc JogContinuous(stream JogHold) returns (google.protobuf.Empty);
+  rpc CancelJog(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Home(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Unlock(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc Reset(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc SetWorkZero(WorkZeroRequest) returns (google.protobuf.Empty);
+  rpc ProbeTouchPlate(ProbeRequest) returns (ProbeReply);
+
+  // Streams
+  rpc WatchStatus(google.protobuf.Empty) returns (stream FeederStatus);
+  rpc WatchEvents(WatchEventsRequest) returns (stream RunEvent);
+
+  // Learning: feedback and run logs for the desktop
+  rpc SubmitFeedback(FeedbackSubmission) returns (google.protobuf.Empty);
+  rpc ListFeedback(ListFeedbackRequest) returns (FeedbackList);
+  rpc AcknowledgeFeedback(FeedbackAck) returns (google.protobuf.Empty);
+  rpc ListRuns(ListRunsRequest) returns (RunList);
+  rpc GetRunLog(RunRef) returns (RunLog);
+
+  // Profile import (section 11.1a)
+  rpc ReadControllerConfig(google.protobuf.Empty) returns (ControllerConfigInfo);
+  rpc SetImportedConfig(ImportedConfig) returns (google.protobuf.Empty);
+}
+
+// Local touch UI only (Unix socket).
+service LocalAdmin {
+  rpc StartPairing(google.protobuf.Empty) returns (PairingCode);
+  rpc CancelPairing(google.protobuf.Empty) returns (google.protobuf.Empty);
+  rpc ListPairings(google.protobuf.Empty) returns (PairingList);
+  rpc RevokePairing(PairingRef) returns (google.protobuf.Empty);
+  rpc GetSettings(google.protobuf.Empty) returns (FeederSettings);
+  rpc UpdateSettings(FeederSettings) returns (FeederSettings);
+  rpc ListSerialPorts(google.protobuf.Empty) returns (SerialPortList);
+}
+
+message FeederInfo {
+  string feeder_id = 1;
+  string name = 2;
+  string version = 3;
+  // Lowercase hex SHA-256 of the DER-encoded TLS certificate.
+  string certificate_fingerprint = 4;
+}
+
+message PairRequest {
+  string code = 1;
+  string client_name = 2;
+}
+
+message PairReply {
+  string pairing_id = 1;
+  string token = 2;
+  FeederInfo feeder = 3;
+}
+
+message PairingCode {
+  string code = 1;
+  google.protobuf.Timestamp expires_at = 2;
+  string certificate_fingerprint = 3;
+}
+
+message PairingInfo {
+  string pairing_id = 1;
+  string client_name = 2;
+  google.protobuf.Timestamp paired_at = 3;
+  google.protobuf.Timestamp last_seen_at = 4;
+}
+
+message PairingList {
+  repeated PairingInfo pairings = 1;
+}
+
+message PairingRef {
+  string pairing_id = 1;
+}
+
+enum TransportKind {
+  TRANSPORT_KIND_SERIAL = 0;
+  TRANSPORT_KIND_TCP = 1;
+}
+
+message FeederSettings {
+  string name = 1;
+  TransportKind transport = 2;
+  string serial_port = 3;
+  int32 baud_rate = 4;
+  string host = 5;
+  int32 tcp_port = 6;
+  // Machine Z for retracts after stop and during recovery.
+  double safe_z_machine = 7;
+  double touch_plate_thickness = 8;
+  double probe_max_travel = 9;
+  double probe_feed = 10;
+  double recovery_margin_mm = 11;
+  double plunge_feed = 12;
+}
+
+message SerialPortList {
+  repeated string ports = 1;
+}
+
+// First message of an upload carries the header, the following ones the file bytes.
+message UploadChunk {
+  oneof part {
+    UploadHeader header = 1;
+    bytes data = 2;
+  }
+}
+
+message UploadHeader {
+  string name = 1;
+  int64 size = 2;
+  // Lowercase hex SHA-256 of the file; the upload is rejected on mismatch.
+  string sha256 = 3;
+  string project_name = 4;
+  string setup_name = 5;
+  string tool_description = 6;
+  string material = 7;
+  double planned_rpm = 8;
+  double estimated_seconds = 9;
+  // Controller config hash of the machine profile the file was posted for (empty = unknown).
+  string config_hash = 10;
+  // Opaque desktop data returned with feedback (e.g. material/tool ids, sections).
+  map<string, string> tags = 11;
+}
+
+message JobInfo {
+  string job_id = 1;
+  UploadHeader header = 2;
+  int32 line_count = 3;
+  google.protobuf.Timestamp uploaded_at = 4;
+  string last_run_state = 5;
+  google.protobuf.Timestamp last_run_at = 6;
+}
+
+message JobList {
+  repeated JobInfo jobs = 1;
+}
+
+message JobRef {
+  string job_id = 1;
+}
+
+// Decimated toolpath in the part frame (A rotation removed). Vertices of one strip form a polyline.
+message Preview {
+  string job_id = 1;
+  // x, y, z per vertex.
+  repeated float positions = 2;
+  // File line of each vertex.
+  repeated int32 lines = 3;
+  repeated int32 strip_starts = 4;
+  repeated bool strip_rapid = 5;
+  repeated float bounds_min = 6;
+  repeated float bounds_max = 7;
+  bool rotary = 8;
+  int32 source_segments = 9;
+}
+
+message StartJobRequest {
+  string job_id = 1;
+  // Start despite warnings (e.g. controller configuration changed since the file was posted).
+  bool accept_warnings = 2;
+}
+
+message StartJobReply {
+  bool started = 1;
+  string run_id = 2;
+  repeated string warnings = 3;
+}
+
+message FeedOverrideRequest {
+  int32 percent = 1;
+}
+
+message SpindleRpmRequest {
+  double rpm = 1;
+}
+
+message RecoveryPlanInfo {
+  bool available = 1;
+  string run_id = 2;
+  string job_id = 3;
+  string job_name = 4;
+  string action = 5;
+  int32 interrupted_line = 6;
+  int32 resume_line = 7;
+  string interruption = 8;
+  repeated string notes = 9;
+}
+
+enum PromptKind {
+  PROMPT_KIND_CONFIRM = 0;
+  // M0/M1 in the program; continue = cycle start.
+  PROMPT_KIND_PROGRAM_PAUSE = 1;
+  // Program pause with the spindle on: the operator enters the dial RPM.
+  PROMPT_KIND_SPINDLE = 2;
+}
+
+message Prompt {
+  string id = 1;
+  PromptKind kind = 2;
+  string message = 3;
+  double suggested_rpm = 4;
+  bool can_cancel = 5;
+  int32 line = 6;
+}
+
+message PromptAnswer {
+  string id = 1;
+  bool confirmed = 2;
+  // Spindle prompts: RPM set on the dial (0 = as suggested).
+  double rpm = 3;
+}
+
+message JogRequest {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double a = 4;
+  double feed = 5;
+}
+
+message JogHold {
+  // First message: direction (signs of x/y/z/a) and feed. Later messages are keep-alives.
+  JogRequest direction = 1;
+}
+
+message WorkZeroRequest {
+  bool x = 1;
+  bool y = 2;
+  bool z = 3;
+  bool a = 4;
+}
+
+message ProbeRequest {
+  // 0 = settings value.
+  double plate_thickness = 1;
+  double max_travel = 2;
+  double feed = 3;
+}
+
+message ProbeReply {
+  double work_z_machine = 1;
+}
+
+enum ConnectionState {
+  CONNECTION_STATE_DISCONNECTED = 0;
+  CONNECTION_STATE_CONNECTING = 1;
+  CONNECTION_STATE_CONNECTED = 2;
+}
+
+message Axes {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+  double a = 4;
+}
+
+message ActiveJob {
+  string job_id = 1;
+  string run_id = 2;
+  string name = 3;
+  string state = 4;
+  int32 line = 5;
+  int32 line_count = 6;
+  bool line_exact = 7;
+  // Time-weighted progress 0..1.
+  double progress = 8;
+  double elapsed_seconds = 9;
+  double remaining_seconds = 10;
+  double spindle_rpm = 11;
+  double planned_rpm = 12;
+  int32 feed_override = 13;
+  string message = 14;
+}
+
+message FeederStatus {
+  int64 sequence = 1;
+  ConnectionState connection = 2;
+  string controller = 3;
+  string firmware = 4;
+  string machine_state = 5;
+  int32 sub_state = 6;
+  Axes machine_position = 7;
+  Axes work_position = 8;
+  Axes work_offset = 9;
+  int32 feed_override = 10;
+  int32 rapid_override = 11;
+  int32 spindle_override = 12;
+  double feed_rate = 13;
+  double spindle_speed = 14;
+  int32 alarm_code = 15;
+  string alarm_text = 16;
+  ActiveJob job = 17;
+  Prompt prompt = 18;
+  repeated string warnings = 19;
+  bool recovery_available = 20;
+  bool recovering = 21;
+  // Run that ended and waits for operator feedback (empty = none).
+  string feedback_run_id = 22;
+  string last_error = 23;
+  // A pairing code is displayed and has not been used or expired.
+  bool pairing_active = 24;
+  int32 pairing_count = 25;
+}
+
+message WatchEventsRequest {
+  // Empty = the current or most recent run.
+  string run_id = 1;
+  // Only events after this sequence number.
+  int64 after = 2;
+}
+
+message RunEvent {
+  int64 sequence = 1;
+  string run_id = 2;
+  google.protobuf.Timestamp at = 3;
+  string kind = 4;
+  int32 line = 5;
+  string message = 6;
+}
+
+enum WearEvent {
+  WEAR_EVENT_NONE = 0;
+  WEAR_EVENT_WEAR = 1;
+  WEAR_EVENT_BREAKAGE = 2;
+  WEAR_EVENT_REPLACED = 3;
+}
+
+message FeedbackSubmission {
+  string run_id = 1;
+  // 1 (bad) .. 5 (good); 0 = not rated.
+  int32 finish_rating = 2;
+  int32 chatter_rating = 3;
+  int32 wear_rating = 4;
+  WearEvent wear_event = 5;
+  string notes = 6;
+  // True when the operator skipped the form; the run is still reported with its logs.
+  bool skipped = 7;
+}
+
+message FeedOverrideChange {
+  google.protobuf.Timestamp at = 1;
+  int32 line = 2;
+  int32 percent = 3;
+}
+
+message RpmChange {
+  google.protobuf.Timestamp at = 1;
+  int32 line = 2;
+  double rpm = 3;
+}
+
+message FeedbackRecord {
+  string run_id = 1;
+  string job_id = 2;
+  UploadHeader job = 3;
+  string final_state = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp ended_at = 6;
+  google.protobuf.Timestamp recorded_at = 7;
+  FeedbackSubmission feedback = 8;
+  repeated FeedOverrideChange feed_overrides = 9;
+  repeated RpmChange rpm_changes = 10;
+  int32 last_line = 11;
+  double runtime_seconds = 12;
+  bool acknowledged = 13;
+}
+
+message ListFeedbackRequest {
+  bool include_acknowledged = 1;
+}
+
+message FeedbackList {
+  repeated FeedbackRecord records = 1;
+}
+
+message FeedbackAck {
+  repeated string run_ids = 1;
+}
+
+message ListRunsRequest {
+  // Empty = all jobs.
+  string job_id = 1;
+}
+
+message RunInfo {
+  string run_id = 1;
+  string job_id = 2;
+  string job_name = 3;
+  string state = 4;
+  google.protobuf.Timestamp started_at = 5;
+  google.protobuf.Timestamp ended_at = 6;
+  int32 last_line = 7;
+  bool has_feedback = 8;
+}
+
+message RunList {
+  repeated RunInfo runs = 1;
+}
+
+message RunRef {
+  string run_id = 1;
+}
+
+message RunLog {
+  RunInfo run = 1;
+  repeated RunEvent events = 2;
+}
+
+message ControllerConfigInfo {
+  string firmware_version = 1;
+  string build_options = 2;
+  // Raw $Config/Dump text.
+  string config_text = 3;
+  string config_hash = 4;
+  repeated string warnings = 5;
+}
+
+message ImportedConfig {
+  // Hash of the controller config imported into the machine profile.
+  string config_hash = 1;
+}

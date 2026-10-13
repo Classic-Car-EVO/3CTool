@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             xmlns:r="using:ThreeCTool.Rendering"
+             x:Class="ThreeCTool.Feeder.Views.JobsView"
+             x:DataType="vm:JobsViewModel">
+  <Grid ColumnDefinitions="330,8,*">
+    <Grid RowDefinitions="*,Auto,Auto">
+      <ListBox Name="JobList" ItemsSource="{Binding Jobs}" SelectedItem="{Binding Selected}" Background="Transparent">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="vm:JobItemViewModel">
+            <StackPanel Margin="0,4" Spacing="2">
+              <TextBlock Text="{Binding Name}" FontSize="18" FontWeight="SemiBold" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Details}" Classes="label" TextTrimming="CharacterEllipsis" />
+              <TextBlock Text="{Binding Summary}" Classes="label" TextTrimming="CharacterEllipsis" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+      <TextBlock Text="No jobs. Send a job from 3C Tool on the desktop." Classes="label" TextWrapping="Wrap"
+                 Margin="8" IsVisible="{Binding IsEmpty}" VerticalAlignment="Top" />
+      <TextBlock Grid.Row="1" Text="{Binding StartHint}" Foreground="{StaticResource WarningBrush}" FontSize="14"
+                 TextWrapping="Wrap" Margin="4,2" />
+      <Grid Grid.Row="2" ColumnDefinitions="*,*,2*" Margin="0,4,0,0">
+        <Button Content="Refresh" Command="{Binding RefreshCommand}" HorizontalAlignment="Stretch" Margin="0,0,4,0" />
+        <Button Grid.Column="1" Name="DeleteButton" Content="Delete" Command="{Binding DeleteCommand}" HorizontalAlignment="Stretch" Margin="0,0,4,0" />
+        <Button Grid.Column="2" Name="StartButton" Content="Start job" Classes="primary" Command="{Binding StartCommand}" HorizontalAlignment="Stretch" />
+      </Grid>
+    </Grid>
+
+    <Grid Grid.Column="2" RowDefinitions="*,Auto">
+      <Border CornerRadius="8" ClipToBounds="True">
+        <Panel>
+          <r:ToolpathView Name="Preview" Scene="{Binding Scene}" Renderer="{Binding Renderer}" />
+          <TextBlock Text="{Binding PreviewText}" Classes="label" HorizontalAlignment="Center" VerticalAlignment="Center" />
+        </Panel>
+      </Border>
+      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="4" Margin="0,4,0,0" HorizontalAlignment="Right">
+        <Button Content="Iso" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Iso}" />
+        <Button Content="Top" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Top}" />
+        <Button Content="Front" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Front}" />
+        <Button Content="Right" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Right}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>
