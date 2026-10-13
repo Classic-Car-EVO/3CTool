@@ -34,7 +34,10 @@ public sealed class PartModel
     public MeshRepairReport? RepairReport { get; set; }
 }
 
-/// <summary>Rotate: axis (X, Y, Z) + AngleDegrees about the origin. Scale: uniform Factor. Translate: (X, Y, Z).</summary>
+/// <summary>
+/// Rotate: axis (X, Y, Z) + AngleDegrees. Scale: uniform Factor. Both act about the pivot (PivotX, PivotY, PivotZ),
+/// the origin by default. Translate: (X, Y, Z).
+/// </summary>
 public sealed class TransformStep
 {
     public TransformKind Kind { get; set; }
@@ -48,6 +51,12 @@ public sealed class TransformStep
     public double AngleDegrees { get; set; }
 
     public double Factor { get; set; } = 1;
+
+    public double PivotX { get; set; }
+
+    public double PivotY { get; set; }
+
+    public double PivotZ { get; set; }
 }
 
 public sealed class MeshRepairReport

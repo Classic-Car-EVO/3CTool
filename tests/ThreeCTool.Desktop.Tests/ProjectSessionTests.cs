@@ -97,6 +97,41 @@ public sealed class ProjectSessionTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task RotateAboutCenter_IsOneStep_AndOldHistoriesWithoutPivotStillLoad()
+    {
+        var machineId = await fixture.DefaultMachineIdAsync();
+        var stl = fixture.WriteBoxStl("block.stl", new Vector3(10, 0, 0), new Vector3(30, 10, 4));
+        await using (var session = await ProjectSession.CreateAsync(fixture.ProjectFolder(), fixture.LibraryPath, "P", machineId, null))
+        {
+            var model = (await session.ImportPartAsync(stl, LengthUnit.Millimeter)).Model;
+            await session.RotateAboutCenterAsync(model, MeshTransforms.Rotate(Vector3.UnitZ, 90));
+            var step = Assert.Single(model.Transforms);
+            Assert.Equal((20.0, 5.0, 2.0), (step.PivotX, step.PivotY, step.PivotZ));
+            var bounds = (await session.MillPartAsync()).Bounds;
+            Assert.Equal((15f, -5f, 0f), (MathF.Round(bounds.Min.X, 3), MathF.Round(bounds.Min.Y, 3), MathF.Round(bounds.Min.Z, 3)));
+            Assert.Equal((25f, 15f, 4f), (MathF.Round(bounds.Max.X, 3), MathF.Round(bounds.Max.Y, 3), MathF.Round(bounds.Max.Z, 3)));
+            await session.AddTransformAsync(model, MeshTransforms.Translate(new Vector3(1, 0, 0)));
+        }
+
+        // Histories saved before pivots existed have no pivot keys: they load as rotations about the origin.
+        var database = Path.Combine(fixture.ProjectFolder(), ProjectDatabase.FileName);
+        await using (var connection = new Microsoft.Data.Sqlite.SqliteConnection("Data Source=" + database))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "UPDATE PartModels SET Transforms = json_remove(Transforms, '$[0].PivotX', '$[0].PivotY', '$[0].PivotZ', '$[1].PivotX', '$[1].PivotY', '$[1].PivotZ') WHERE Transforms LIKE '%PivotX%'";
+            Assert.Equal(1, await command.ExecuteNonQueryAsync());
+        }
+
+        Microsoft.Data.Sqlite.SqliteConnection.ClearAllPools();
+        await using var reopened = await ProjectSession.OpenAsync(fixture.ProjectFolder(), fixture.LibraryPath);
+        var steps = Assert.Single(reopened.Parts).Transforms;
+        Assert.Equal(2, steps.Count);
+        Assert.All(steps, s => Assert.Equal((0.0, 0.0, 0.0), (s.PivotX, s.PivotY, s.PivotZ)));
+        Assert.Equal(-9f, (await reopened.MillPartAsync()).Bounds.Min.X, 3);
+    }
+
+    [Fact]
     public async Task ModelPaths_CannotEscapeTheProject()
     {
         Assert.Throws<InvalidDataException>(() => PartGeometry.Resolve(fixture.Root, "../x.stl"));

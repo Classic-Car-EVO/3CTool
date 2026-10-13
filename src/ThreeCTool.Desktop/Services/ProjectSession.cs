@@ -442,15 +442,12 @@ public sealed class ProjectSession : IAsyncDisposable
         }
     }
 
-    /// <summary>Rotation about the model's bounding-box centre (translate to origin, rotate, translate back).</summary>
+    /// <summary>Rotation or scale about the model's current bounding-box centre, as one (undoable) step.</summary>
     public async Task RotateAboutCenterAsync(PartModel model, TransformStep rotation, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(rotation);
         var center = (await LoadPartAsync(model, cancellationToken).ConfigureAwait(true)).AllBodies().Bounds.Center;
-        model.Transforms.Add(MeshTransforms.Translate(-center));
-        model.Transforms.Add(rotation);
-        model.Transforms.Add(MeshTransforms.Translate(center));
-        await SaveAsync(cancellationToken).ConfigureAwait(true);
+        await AddTransformAsync(model, MeshTransforms.About(rotation, center), cancellationToken).ConfigureAwait(true);
     }
 
     // ----- Stock -----

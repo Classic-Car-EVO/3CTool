@@ -6,6 +6,11 @@
              RequestedThemeVariant="Default">
 
   <Application.DataTemplates>
+    <DataTemplate DataType="vm:ProjectViewModel"><views:ProjectView /></DataTemplate>
+    <DataTemplate DataType="vm:ProjectDetailsViewModel"><views:ProjectDetailsView /></DataTemplate>
+    <DataTemplate DataType="vm:PartsViewModel"><views:PartsView /></DataTemplate>
+    <DataTemplate DataType="vm:StockViewModel"><views:StockView /></DataTemplate>
+    <DataTemplate DataType="vm:KeepOutsViewModel"><views:KeepOutsView /></DataTemplate>
     <DataTemplate DataType="vm:LibraryViewModel"><views:LibraryView /></DataTemplate>
     <DataTemplate DataType="vm:MachinesViewModel"><views:MachinesView /></DataTemplate>
     <DataTemplate DataType="vm:ToolsViewModel"><views:ToolsView /></DataTemplate>

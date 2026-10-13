@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:m="using:ThreeCTool.Core.Machines"
+             xmlns:mat="using:ThreeCTool.Core.Materials"
+             xmlns:r="using:ThreeCTool.Rendering"
+             x:Class="ThreeCTool.Desktop.Views.ProjectView"
+             x:DataType="vm:ProjectViewModel">
+  <Panel>
+    <!-- Start screen -->
+    <ScrollViewer IsVisible="{Binding HasNoProject}">
+      <Grid ColumnDefinitions="520,24,*" Margin="0,8,0,0" HorizontalAlignment="Left">
+        <Border Classes="card" VerticalAlignment="Top">
+          <StackPanel Spacing="4">
+            <TextBlock Text="New project" Classes="title" />
+            <Grid ColumnDefinitions="140,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,6,0,0">
+              <TextBlock Text="Name" VerticalAlignment="Center" />
+              <TextBox Grid.Column="1" Name="NewProjectName" Text="{Binding NewName}" PlaceholderText="e.g. Walnut bowl" />
+              <TextBlock Grid.Row="1" Text="Location" VerticalAlignment="Center" />
+              <Grid Grid.Row="1" Grid.Column="1" ColumnDefinitions="*,Auto" Margin="0,4,0,0">
+                <TextBox Text="{Binding NewLocation}" />
+                <Button Grid.Column="1" Content="Browse..." Command="{Binding BrowseLocationCommand}" Margin="6,0,0,0" />
+              </Grid>
+              <TextBlock Grid.Row="2" Text="Machine" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="2" Grid.Column="1" Name="NewProjectMachine" ItemsSource="{Binding Machines}" SelectedItem="{Binding NewMachine}"
+                        HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="m:MachineProfile"><TextBlock Text="{Binding Name}" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Grid.Row="3" Text="Material" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="3" Grid.Column="1" Name="NewProjectMaterial" ItemsSource="{Binding Materials}" SelectedItem="{Binding NewMaterial}"
+                        PlaceholderText="Choose later" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate x:DataType="mat:Material"><TextBlock Text="{Binding Name}" /></DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <TextBlock Grid.Row="4" Text="Optimise for" VerticalAlignment="Center" />
+              <ComboBox Grid.Row="4" Grid.Column="1" ItemsSource="{x:Static vm:ProjectViewModel.Goals}" SelectedItem="{Binding NewGoal}"
+                        HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+            </Grid>
+            <TextBlock Classes="muted" TextWrapping="Wrap" Margin="0,4"
+                       Text="The project is a folder holding its database, copies of the imported models and the generated files. The machine, material and tools are copied in, so later library edits do not change it until you refresh them." />
+            <Button Name="CreateProject" Content="Create project" Classes="primary" Command="{Binding CreateCommand}" />
+          </StackPanel>
+        </Border>
+
+        <Border Grid.Column="2" Classes="card" VerticalAlignment="Top" MinWidth="420">
+          <StackPanel Spacing="6">
+            <TextBlock Text="Open" Classes="title" />
+            <Button Name="OpenProject" Content="Open project folder..." Command="{Binding OpenCommand}" />
+            <TextBlock Text="Recent" Classes="section" />
+            <TextBlock Text="No recent projects." Classes="muted" IsVisible="{Binding !Recent.Count}" />
+            <ItemsControl Name="RecentProjects" ItemsSource="{Binding Recent}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:RecentProject">
+                  <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                    <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                            Command="{Binding $parent[UserControl].((vm:ProjectViewModel)DataContext).OpenRecentCommand}" CommandParameter="{Binding}">
+                      <StackPanel>
+                        <TextBlock Text="{Binding Name}" />
+                        <TextBlock Text="{Binding Folder}" Classes="muted" FontSize="12" />
+                      </StackPanel>
+                    </Button>
+                    <Button Grid.Column="1" Content="Forget" Margin="6,0,0,0" VerticalAlignment="Center"
+                            Command="{Binding $parent[UserControl].((vm:ProjectViewModel)DataContext).RemoveRecentCommand}" CommandParameter="{Binding}" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </Border>
+      </Grid>
+    </ScrollViewer>
+
+    <!-- Open project -->
+    <Grid ColumnDefinitions="480,*" IsVisible="{Binding HasProject}" Margin="0,4,0,0">
+      <TabControl Name="ProjectTabs" Margin="0,0,12,0">
+        <TabItem Header="Overview"><ContentControl Content="{Binding Details}" /></TabItem>
+        <TabItem Header="Models"><ContentControl Content="{Binding Parts}" /></TabItem>
+        <TabItem Header="Stock"><ContentControl Content="{Binding Stock}" /></TabItem>
+        <TabItem Header="Keep-outs"><ContentControl Content="{Binding KeepOuts}" /></TabItem>
+      </TabControl>
+
+      <DockPanel Grid.Column="1">
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+          <Button Content="Iso" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Iso}" Margin="0,0,4,4" />
+          <Button Content="Top" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Top}" Margin="0,0,4,4" />
+          <Button Content="Front" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Front}" Margin="0,0,4,4" />
+          <Button Content="Right" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Right}" Margin="0,0,4,4" />
+          <Button Content="Fit" Command="{Binding Scene.FitCommand}" Margin="0,0,16,4" />
+          <CheckBox Content="Part" IsChecked="{Binding Scene.ShowPart}" Margin="0,0,8,4" />
+          <CheckBox Content="Stock" IsChecked="{Binding Scene.ShowStock}" Margin="0,0,8,4" />
+          <CheckBox Content="Keep-outs" IsChecked="{Binding Scene.ShowKeepOuts}" Margin="0,0,16,4" />
+          <Button Name="CloseProject" Content="Close project" Command="{Binding CloseCommand}" Margin="0,0,4,4" />
+        </WrapPanel>
+        <TextBlock DockPanel.Dock="Bottom" Classes="muted" FontSize="12" Margin="0,4,0,0"
+                   Text="Drag to orbit, right-drag or middle-drag to pan, wheel to zoom." />
+        <Border BorderBrush="#40808080" BorderThickness="1" ClipToBounds="True">
+          <r:CamView Name="ProjectScene" Scene="{Binding Scene.Scene}" Renderer="{Binding Renderer}" />
+        </Border>
+      </DockPanel>
+    </Grid>
+  </Panel>
+</UserControl>

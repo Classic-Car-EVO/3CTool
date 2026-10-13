@@ -1,0 +1,34 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             x:Class="ThreeCTool.Desktop.Views.StockView"
+             x:DataType="vm:StockViewModel">
+  <ScrollViewer>
+    <StackPanel Margin="0,4,14,8">
+      <Grid ColumnDefinitions="130,*">
+        <TextBlock Text="Stock" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" Name="StockShape" ItemsSource="{x:Static vm:StockViewModel.Types}" SelectedItem="{Binding Type}" HorizontalAlignment="Stretch" />
+      </Grid>
+
+      <StackPanel IsVisible="{Binding IsBox}" Margin="0,8,0,0">
+        <ItemsControl Name="BoxStockFields" ItemsSource="{Binding BoxFields}" />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsCylinder}" Margin="0,8,0,0">
+        <ItemsControl Name="CylinderStockFields" ItemsSource="{Binding CylinderFields}" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12"
+                   Text="The cylinder lies along X; its axis should be on the rotary axis of the machine." />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsMesh}" Margin="0,8,0,0" Spacing="4">
+        <TextBlock Text="{Binding MeshPath}" />
+        <Button Content="Choose another mesh..." Command="{Binding LoadMeshCommand}" />
+      </StackPanel>
+
+      <StackPanel IsVisible="{Binding !IsMesh}">
+        <TextBlock Text="Fit to the models" Classes="section" />
+        <ContentControl Content="{Binding Margin}" />
+        <Button Name="FitStock" Content="Fit stock" Command="{Binding FitToPartCommand}" Margin="0,4,0,0" />
+        <Button Content="Use a mesh file..." Command="{Binding LoadMeshCommand}" Margin="0,12,0,0" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

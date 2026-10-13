@@ -19,10 +19,24 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
     {
         Services = services;
         Files = files;
+        Workspace = new ProjectWorkspace(this);
+        Project = new ProjectViewModel(this, Workspace);
         Library = new LibraryViewModel(this);
         Settings = new SettingsViewModel(this);
-        Pages = [Library, Settings];
-        SelectedPage = Library;
+        Pages = [Project, Library, Settings];
+        SelectedPage = Project;
+        Workspace.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ProjectWorkspace.Session))
+            {
+                if (Workspace.Session is { } session)
+                {
+                    session.Changed += (_, _) => OnPropertyChanged(nameof(WindowTitle));
+                }
+
+                OnPropertyChanged(nameof(WindowTitle));
+            }
+        };
         ready = true;
     }
 
@@ -30,11 +44,17 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
 
     public IFileDialogs Files { get; }
 
+    public ProjectWorkspace Workspace { get; }
+
+    public ProjectViewModel Project { get; }
+
     public LibraryViewModel Library { get; }
 
     public SettingsViewModel Settings { get; }
 
     public IReadOnlyList<PageViewModel> Pages { get; }
+
+    public string WindowTitle => Workspace.Session is { } session ? $"{session.Project.Name} - 3C Tool" : "3C Tool";
 
     [ObservableProperty]
     public partial PageViewModel SelectedPage { get; set; }
@@ -123,6 +143,7 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
     private static bool IsExpected(Exception ex) => ex
         is LibraryValidationException
         or IOException
+        or KeyNotFoundException
         or UnauthorizedAccessException
         or InvalidOperationException
         or InvalidDataException
@@ -147,5 +168,9 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
     }
 
     [RelayCommand]
-    private void DismissMessage() => Message = null;
+    private void DismissMessage()
+    {
+        Message = null;
+        MessageIsError = false;
+    }
 }

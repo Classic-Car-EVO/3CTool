@@ -23,7 +23,11 @@ public partial class App : Application
             var viewModel = new MainViewModel(services, new StorageFileDialogs(window));
             window.DataContext = viewModel;
             desktop.MainWindow = window;
-            desktop.Exit += (_, _) => services.Dispose();
+            desktop.Exit += (_, _) =>
+            {
+                viewModel.Workspace.Session?.DisposeAsync().AsTask().GetAwaiter().GetResult();
+                services.Dispose();
+            };
             _ = viewModel.InitializeAsync();
         }
 

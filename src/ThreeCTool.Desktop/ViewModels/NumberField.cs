@@ -17,15 +17,17 @@ public sealed partial class NumberField : ObservableObject, IEditField
     private readonly LengthUnit? unit;
     private readonly bool optional;
     private readonly bool integer;
+    private readonly bool positive;
     private bool refreshing;
 
-    private NumberField(string label, Func<double?> get, Action<double?> set, LengthUnit? unit, bool optional, bool integer)
+    private NumberField(string label, Func<double?> get, Action<double?> set, LengthUnit? unit, bool optional, bool integer, bool positive = false)
     {
         this.get = get;
         this.set = set;
         this.unit = unit;
         this.optional = optional;
         this.integer = integer;
+        this.positive = positive;
         Label = label;
         Refresh();
     }
@@ -51,6 +53,10 @@ public sealed partial class NumberField : ObservableObject, IEditField
 
     public static NumberField Length(string label, Func<double> get, Action<double> set, LengthUnit unit) =>
         new(label, () => get(), v => set(v!.Value), unit, optional: false, integer: false);
+
+    /// <summary>A length that must be greater than zero (sizes, diameters).</summary>
+    public static NumberField PositiveLength(string label, Func<double> get, Action<double> set, LengthUnit unit) =>
+        new(label, () => get(), v => set(v!.Value), unit, optional: false, integer: false, positive: true);
 
     public static NumberField OptionalLength(string label, Func<double?> get, Action<double?> set, LengthUnit unit) =>
         new(label, get, set, unit, optional: true, integer: false);
@@ -146,6 +152,13 @@ public sealed partial class NumberField : ObservableObject, IEditField
         }
 
         value = negative ? -magnitude : magnitude;
+        if (positive && value <= 0)
+        {
+            error = $"{Label} must be greater than zero.";
+            value = null;
+            return false;
+        }
+
         return true;
     }
 }

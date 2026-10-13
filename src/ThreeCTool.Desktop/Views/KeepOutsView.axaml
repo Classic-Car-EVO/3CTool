@@ -1,0 +1,53 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:p="using:ThreeCTool.Core.Projects"
+             x:Class="ThreeCTool.Desktop.Views.KeepOutsView"
+             x:DataType="vm:KeepOutsViewModel">
+  <ScrollViewer>
+    <StackPanel Margin="0,4,14,8">
+      <TextBlock Text="No keep-out zones." Classes="muted" IsVisible="{Binding !Zones.Count}" />
+      <ItemsControl Name="KeepOutList" ItemsSource="{Binding Zones}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:KeepOutRow">
+            <Border Classes="card">
+              <Grid ColumnDefinitions="*,Auto">
+                <StackPanel>
+                  <TextBlock Text="{Binding Title}" />
+                  <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+                <Button Grid.Column="1" Content="Remove" VerticalAlignment="Center"
+                        Command="{Binding $parent[UserControl].((vm:KeepOutsViewModel)DataContext).RemoveCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </Border>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="Add a zone" Classes="section" />
+      <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto">
+        <TextBlock Text="Name" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Name="KeepOutName" Text="{Binding Name}" PlaceholderText="e.g. Left vise jaw" />
+        <TextBlock Grid.Row="1" Text="Fixed to" VerticalAlignment="Center" />
+        <ComboBox Grid.Row="1" Grid.Column="1" Name="KeepOutFixedTo" ItemsSource="{x:Static vm:KeepOutsViewModel.Attachments}" SelectedItem="{Binding Attachment}"
+                  HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+        <TextBlock Grid.Row="2" Text="Setup" VerticalAlignment="Center" IsVisible="{Binding NeedsSetup}" />
+        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{Binding Setups}" SelectedItem="{Binding Setup}" IsVisible="{Binding NeedsSetup}"
+                  HorizontalAlignment="Stretch" Margin="0,4,0,0">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="p:Setup"><TextBlock Text="{Binding Name}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Row="3" Text="Shape" VerticalAlignment="Center" />
+        <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:KeepOutsViewModel.Shapes}" SelectedItem="{Binding Shape}"
+                  HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+      </Grid>
+      <ItemsControl ItemsSource="{Binding PositionFields}" Margin="0,6,0,0" />
+      <ItemsControl ItemsSource="{Binding BoxFields}" IsVisible="{Binding IsBox}" />
+      <ContentControl Content="{Binding Radius}" IsVisible="{Binding !IsBox}" />
+      <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Margin="0,4"
+                 Text="Positions are in the part frame for part zones, in the setup's work coordinates for WCS zones and in machine coordinates for machine zones." />
+      <Button Name="AddKeepOut" Content="Add zone" Command="{Binding AddCommand}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

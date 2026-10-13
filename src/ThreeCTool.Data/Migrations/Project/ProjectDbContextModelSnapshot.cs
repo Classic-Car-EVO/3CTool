@@ -1685,6 +1685,12 @@ namespace ThreeCTool.Data.Migrations.Project
                             b1.Property<string>("Kind")
                                 .IsRequired();
 
+                            b1.Property<double>("PivotX");
+
+                            b1.Property<double>("PivotY");
+
+                            b1.Property<double>("PivotZ");
+
                             b1.Property<double>("X");
 
                             b1.Property<double>("Y");

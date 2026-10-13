@@ -36,13 +36,55 @@ public sealed class MainWindowUiTests : IAsyncDisposable
     {
         await fixture.Library.SaveToolAsync(DesktopFixture.FlatEndMill());
         using var services = new AppServices(new AppPaths(fixture.Root));
-        var main = new MainViewModel(services, new FakeFileDialogs());
+        var files = new FakeFileDialogs();
+        var main = new MainViewModel(services, files);
         var window = new MainWindow { DataContext = main };
         window.Show();
         try
         {
             await main.InitializeAsync();
             await FindAsync<ListBox>(window, "Navigation");
+            await FindAsync<TextBox>(window, "NewProjectName");
+            await FindAsync<ComboBox>(window, "NewProjectMachine");
+            await FindAsync<Button>(window, "OpenProject");
+            var create = await FindAsync<Button>(window, "CreateProject");
+            Capture(window);
+
+            main.Project.NewLocation = fixture.Root;
+            main.Project.NewName = "Bracket";
+            create.Command!.Execute(null);
+            var tabs = await FindAsync<TabControl>(window, "ProjectTabs");
+            await FindAsync<Control>(window, "ProjectScene");
+            await FindAsync<Button>(window, "CloseProject");
+            var projectName = await FindAsync<TextBox>(window, "ProjectName");
+            Assert.Equal("Bracket", projectName.Text);
+            Assert.Equal("Bracket - 3C Tool", window.Title);
+            await FindAsync<ItemsControl>(window, "AvailableTools");
+            Capture(window);
+
+            tabs.SelectedIndex = 1;
+            var import = await FindAsync<Button>(window, "ImportModel");
+            files.Answers.Enqueue(fixture.WriteBoxStl("block.stl", System.Numerics.Vector3.Zero, new System.Numerics.Vector3(20, 10, 5)));
+            import.Command!.Execute(null);
+            await FindAsync<ListBox>(window, "PartList");
+            var partName = await FindAsync<TextBox>(window, "PartName");
+            Assert.Equal("block", partName.Text);
+            await FindAsync<Button>(window, "PlaceCenter");
+            Capture(window);
+
+            tabs.SelectedIndex = 2;
+            await FindAsync<ComboBox>(window, "StockShape");
+            await FindAsync<Control>(window, "BoxStockFields");
+            await FindAsync<Button>(window, "FitStock");
+            Capture(window);
+
+            tabs.SelectedIndex = 3;
+            await FindAsync<Control>(window, "KeepOutList");
+            await FindAsync<Button>(window, "AddKeepOut");
+            Capture(window);
+            await main.Workspace.ReplaceAsync(null);
+
+            main.SelectedPage = main.Library;
             await FindAsync<TabControl>(window, "LibraryTabs");
 
             var machineName = await FindAsync<TextBox>(window, "MachineName");

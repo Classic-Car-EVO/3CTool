@@ -5,7 +5,7 @@
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
         Width="1400" Height="900" MinWidth="1000" MinHeight="640"
-        Title="3C Tool">
+        Title="{Binding WindowTitle}">
 
   <Grid RowDefinitions="*,Auto">
     <Grid ColumnDefinitions="150,*">

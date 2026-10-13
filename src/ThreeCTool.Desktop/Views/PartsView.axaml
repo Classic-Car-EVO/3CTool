@@ -1,0 +1,108 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:p="using:ThreeCTool.Core.Projects"
+             xmlns:g="using:ThreeCTool.Geometry"
+             x:Class="ThreeCTool.Desktop.Views.PartsView"
+             x:DataType="vm:PartsViewModel">
+  <ScrollViewer>
+    <StackPanel Margin="0,4,14,8">
+      <Grid ColumnDefinitions="Auto,*,Auto">
+        <TextBlock Text="Unit for STL files" VerticalAlignment="Center" Margin="0,0,8,0" />
+        <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:PartsViewModel.Units}" SelectedItem="{Binding ImportUnit}" HorizontalAlignment="Stretch" />
+        <Button Grid.Column="2" Name="ImportModel" Content="Import model..." Classes="primary" Command="{Binding ImportCommand}" Margin="8,0,0,0" />
+      </Grid>
+
+      <TextBlock Text="No models yet." Classes="muted" Margin="0,8" IsVisible="{Binding !Parts.Count}" />
+      <ListBox Name="PartList" ItemsSource="{Binding Parts}" SelectedItem="{Binding Selected}" MaxHeight="160" Margin="0,8,0,0"
+               IsVisible="{Binding !!Parts.Count}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="p:PartModel">
+            <StackPanel>
+              <TextBlock Text="{Binding Name}" />
+              <TextBlock Text="{Binding FilePath}" Classes="muted" FontSize="12" />
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+
+      <StackPanel IsVisible="{Binding HasSelection}">
+        <TextBlock Text="Model" Classes="section" />
+        <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto">
+          <TextBlock Text="Name" VerticalAlignment="Center" />
+          <TextBox Grid.Column="1" Name="PartName" Text="{Binding SelectedName}" />
+          <TextBlock Grid.Row="1" Text="Use" VerticalAlignment="Center" />
+          <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:PartsViewModel.Roles}" SelectedItem="{Binding SelectedRole}"
+                    HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+          <TextBlock Grid.Row="2" Text="File unit" VerticalAlignment="Center" />
+          <ComboBox Grid.Row="2" Grid.Column="1" Name="PartUnit" ItemsSource="{x:Static vm:PartsViewModel.Units}" SelectedItem="{Binding SelectedUnit}"
+                    HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+          <TextBlock Grid.Row="3" Text="Size" VerticalAlignment="Center" />
+          <TextBlock Grid.Row="3" Grid.Column="1" Name="PartSize" Text="{Binding SizeText}" Margin="0,6,0,0" />
+        </Grid>
+        <TextBlock Text="{Binding RepairText}" Classes="muted" TextWrapping="Wrap" Margin="0,6,0,0" />
+
+        <TextBlock Text="Place" Classes="section" />
+        <WrapPanel>
+          <Button Content="On stock top" Command="{Binding PlaceCommand}" CommandParameter="{x:Static g:StockAnchor.Top}" Margin="0,0,4,4" />
+          <Button Content="On stock bottom" Command="{Binding PlaceCommand}" CommandParameter="{x:Static g:StockAnchor.Bottom}" Margin="0,0,4,4" />
+          <Button Name="PlaceCenter" Content="Stock centre" Command="{Binding PlaceCommand}" CommandParameter="{x:Static g:StockAnchor.Center}" Margin="0,0,4,4" />
+        </WrapPanel>
+        <TextBlock Text="Cylinder stock places the model on the rotary axis." Classes="muted" FontSize="12" />
+
+        <TextBlock Text="Move" Classes="section" />
+        <ContentControl Content="{Binding MoveX}" />
+        <ContentControl Content="{Binding MoveY}" />
+        <ContentControl Content="{Binding MoveZ}" />
+        <Button Name="MovePart" Content="Move" Command="{Binding MoveCommand}" Margin="0,4,0,0" />
+
+        <TextBlock Text="Rotate (about the model centre)" Classes="section" />
+        <WrapPanel>
+          <Button Content="X +90" Command="{Binding QuarterTurnCommand}" CommandParameter="X+" Margin="0,0,4,4" />
+          <Button Content="X -90" Command="{Binding QuarterTurnCommand}" CommandParameter="X-" Margin="0,0,4,4" />
+          <Button Content="Y +90" Command="{Binding QuarterTurnCommand}" CommandParameter="Y+" Margin="0,0,4,4" />
+          <Button Content="Y -90" Command="{Binding QuarterTurnCommand}" CommandParameter="Y-" Margin="0,0,4,4" />
+          <Button Content="Z +90" Command="{Binding QuarterTurnCommand}" CommandParameter="Z+" Margin="0,0,4,4" />
+          <Button Content="Z -90" Command="{Binding QuarterTurnCommand}" CommandParameter="Z-" Margin="0,0,4,4" />
+        </WrapPanel>
+        <Grid ColumnDefinitions="130,*">
+          <TextBlock Text="Axis" VerticalAlignment="Center" />
+          <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:PartsViewModel.Axes}" SelectedItem="{Binding RotateAxis}" />
+        </Grid>
+        <ContentControl Content="{Binding RotateAngle}" />
+        <Button Content="Rotate" Command="{Binding RotateCommand}" Margin="0,4,0,0" />
+
+        <TextBlock Text="Scale (about the model centre)" Classes="section" />
+        <ContentControl Content="{Binding ScaleFactor}" />
+        <Button Content="Scale" Command="{Binding ScaleCommand}" Margin="0,4,0,0" />
+
+        <TextBlock Text="History" Classes="section" />
+        <TextBlock Text="As imported." Classes="muted" IsVisible="{Binding !Transforms.Count}" />
+        <ItemsControl Name="TransformHistory" ItemsSource="{Binding Transforms}" />
+        <StackPanel Orientation="Horizontal" Spacing="6" Margin="0,4,0,0">
+          <Button Name="UndoTransform" Content="Undo" Command="{Binding UndoCommand}" />
+          <Button Content="Reset" Command="{Binding ClearTransformsCommand}" />
+        </StackPanel>
+
+        <TextBlock Text="Orientation suggestions" Classes="section" />
+        <Grid ColumnDefinitions="*,Auto">
+          <ComboBox ItemsSource="{x:Static vm:PartsViewModel.Modes}" SelectedItem="{Binding Mode}" HorizontalAlignment="Stretch" />
+          <Button Grid.Column="1" Name="SuggestOrientation" Content="Suggest" Command="{Binding SuggestCommand}" Margin="6,0,0,0" />
+        </Grid>
+        <ItemsControl Name="Suggestions" ItemsSource="{Binding Suggestions}" Margin="0,4,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:OrientationRow">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Apply" Margin="6,0,0,0"
+                        Command="{Binding $parent[UserControl].((vm:PartsViewModel)DataContext).ApplySuggestionCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+
+        <Button Name="RemovePart" Content="Remove model" Classes="danger" Command="{Binding RemoveCommand}" Margin="0,16,0,0" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>
