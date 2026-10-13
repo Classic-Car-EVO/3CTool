@@ -82,6 +82,35 @@ public sealed class MainWindowUiTests : IAsyncDisposable
             await FindAsync<Control>(window, "KeepOutList");
             await FindAsync<Button>(window, "AddKeepOut");
             Capture(window);
+
+            main.Project.Details.AvailableTools[0].IsSelected = true;
+            await main.Project.Details.AddToolsCommand.ExecuteAsync(null);
+            main.SelectedPage = main.Machining;
+            await FindAsync<Control>(window, "MachiningScene");
+            await FindAsync<Button>(window, "RunAll");
+            var setupName = await FindAsync<TextBox>(window, "SetupName");
+            Assert.Equal(main.Workspace.Session!.Setups[0].Name, setupName.Text);
+            await FindAsync<ComboBox>(window, "SetupOrientation");
+            Capture(window);
+
+            var machiningTabs = await FindAsync<TabControl>(window, "MachiningTabs");
+            machiningTabs.SelectedIndex = 1;
+            await Wait.UntilAsync(() => main.Machining.NewTool is not null, "tools loaded");
+            var addOperation = await FindAsync<Button>(window, "AddOperation");
+            addOperation.Command!.Execute(null);
+            await FindAsync<ListBox>(window, "OperationList");
+            var operationName = await FindAsync<TextBox>(window, "OperationName");
+            Assert.Equal(main.Machining.OperationEditor!.Name, operationName.Text);
+            await FindAsync<ComboBox>(window, "OperationTool");
+            Capture(window);
+
+            machiningTabs.SelectedIndex = 2;
+            await FindAsync<ItemsControl>(window, "FeedList");
+            machiningTabs.SelectedIndex = 3;
+            await FindAsync<TextBlock>(window, "SimulationSummary");
+            machiningTabs.SelectedIndex = 4;
+            await FindAsync<Button>(window, "ExportGcode");
+            Capture(window);
             await main.Workspace.ReplaceAsync(null);
 
             main.SelectedPage = main.Library;
@@ -137,6 +166,7 @@ public sealed class MainWindowUiTests : IAsyncDisposable
         finally
         {
             window.Close();
+            main.Dispose();
         }
     });
 

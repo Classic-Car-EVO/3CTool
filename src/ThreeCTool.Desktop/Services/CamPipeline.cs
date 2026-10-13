@@ -89,6 +89,9 @@ public sealed class CamPipeline : IDisposable
     /// <summary>Enabled operations in machining order.</summary>
     public IReadOnlyList<Operation> ExecutionOrder() => [.. Plan().SelectMany(g => g.Operations)];
 
+    /// <summary>Up-to-date toolpaths in machining order (operations without one are skipped).</summary>
+    public IReadOnlyList<GeneratedToolpath> CurrentToolpaths() => [.. ExecutionOrder().Select(o => GetToolpath(o.Id)).OfType<GeneratedToolpath>()];
+
     /// <summary>Hash of everything a toolpath depends on, including the operations machined before it.</summary>
     public string InputHash(Operation operation)
     {
@@ -173,6 +176,25 @@ public sealed class CamPipeline : IDisposable
 
         progress?.Report(new CamProgress("Toolpaths", string.Empty, 1));
         return results;
+    }
+
+    /// <summary>Loads the cached toolpaths whose inputs are unchanged, without generating any; returns how many are current.</summary>
+    public async Task<int> LoadCacheAsync(CancellationToken cancellationToken = default)
+    {
+        var hashes = new List<string>();
+        var current = 0;
+        foreach (var operation in ExecutionOrder())
+        {
+            var hash = Hash(operation, hashes);
+            hashes.Add(hash);
+            if (await LoadCachedAsync(operation, hash, cancellationToken).ConfigureAwait(true) is { } generated)
+            {
+                toolpaths[operation.Id] = generated;
+                current++;
+            }
+        }
+
+        return current;
     }
 
     // ----- Feeds -----
@@ -263,6 +285,14 @@ public sealed class CamPipeline : IDisposable
         ArgumentNullException.ThrowIfNull(playback);
         using var lease = await compute.AcquireAsync(cancellationToken).ConfigureAwait(true);
         await Task.Run(() => playback.Seek(step, move), cancellationToken).ConfigureAwait(true);
+    }
+
+    /// <summary>Surface points of a simulated stock (part frame), for display.</summary>
+    public async Task<System.Numerics.Vector3[]> SurfacePointsAsync(Compute.DexelStock stock, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(stock);
+        using var lease = await compute.AcquireAsync(cancellationToken).ConfigureAwait(true);
+        return await Task.Run(stock.SurfacePoints, cancellationToken).ConfigureAwait(true);
     }
 
     // ----- Post -----

@@ -10,7 +10,7 @@ using ThreeCTool.Desktop.Services;
 namespace ThreeCTool.Desktop.ViewModels;
 
 /// <summary>The main window: page navigation, status messages, confirmations and error handling for all pages.</summary>
-public sealed partial class MainViewModel : ViewModelBase, IShell
+public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
 {
     private readonly bool ready;
     private int busy;
@@ -21,9 +21,10 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
         Files = files;
         Workspace = new ProjectWorkspace(this);
         Project = new ProjectViewModel(this, Workspace);
+        Machining = new MachiningViewModel(this, Workspace);
         Library = new LibraryViewModel(this);
         Settings = new SettingsViewModel(this);
-        Pages = [Project, Library, Settings];
+        Pages = [Project, Machining, Library, Settings];
         SelectedPage = Project;
         Workspace.PropertyChanged += (_, e) =>
         {
@@ -47,6 +48,8 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
     public ProjectWorkspace Workspace { get; }
 
     public ProjectViewModel Project { get; }
+
+    public MachiningViewModel Machining { get; }
 
     public LibraryViewModel Library { get; }
 
@@ -91,6 +94,8 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
         Message = message;
         MessageIsError = isError;
     }
+
+    public void Dispose() => Machining.Dispose();
 
     public async Task<bool> ConfirmAsync(string title, string message, string confirmText = "OK", bool danger = false)
     {
@@ -142,6 +147,7 @@ public sealed partial class MainViewModel : ViewModelBase, IShell
 
     private static bool IsExpected(Exception ex) => ex
         is LibraryValidationException
+        or Post.PostException
         or IOException
         or KeyNotFoundException
         or UnauthorizedAccessException

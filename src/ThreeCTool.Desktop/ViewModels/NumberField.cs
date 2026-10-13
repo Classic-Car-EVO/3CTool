@@ -49,6 +49,10 @@ public sealed partial class NumberField : ObservableObject, IEditField
 
     public bool HasError => Error is not null;
 
+    /// <summary>Placeholder shown while an optional field is empty (e.g. the value used instead).</summary>
+    [ObservableProperty]
+    public partial string? Hint { get; set; }
+
     string? IEditField.EntryError => Error;
 
     public static NumberField Length(string label, Func<double> get, Action<double> set, LengthUnit unit) =>

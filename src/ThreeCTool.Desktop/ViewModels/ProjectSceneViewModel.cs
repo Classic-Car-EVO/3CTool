@@ -25,6 +25,25 @@ public sealed partial class ProjectSceneViewModel : ObservableObject
     [ObservableProperty]
     public partial bool ShowKeepOuts { get; set; } = true;
 
+    [ObservableProperty]
+    public partial bool ShowToolpaths { get; set; } = true;
+
+    [ObservableProperty]
+    public partial bool ShowSimulation { get; set; } = true;
+
+    public bool ShowRapids
+    {
+        get => Scene.ShowRapids;
+        set
+        {
+            if (Scene.ShowRapids != value)
+            {
+                Scene.ShowRapids = value;
+                OnPropertyChanged();
+            }
+        }
+    }
+
     /// <summary>Rebuilds the meshes from the project (model files are loaded once per session).</summary>
     public async Task RefreshAsync(ProjectSession session)
     {
@@ -77,4 +96,12 @@ public sealed partial class ProjectSceneViewModel : ObservableObject
     partial void OnShowStockChanged(bool value) => Scene.SetVisible(SceneLayer.Stock, value);
 
     partial void OnShowKeepOutsChanged(bool value) => Scene.SetVisible(SceneLayer.KeepOut, value);
+
+    partial void OnShowToolpathsChanged(bool value) => Scene.SetVisible(SceneLayer.Toolpath, value);
+
+    partial void OnShowSimulationChanged(bool value)
+    {
+        Scene.SetVisible(SceneLayer.Simulation, value);
+        Scene.SetVisible(SceneLayer.Tool, value);
+    }
 }

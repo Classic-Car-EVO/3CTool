@@ -1,0 +1,73 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:t="using:ThreeCTool.Core.Tooling"
+             x:Class="ThreeCTool.Desktop.Views.OperationEditorView"
+             x:DataType="vm:OperationEditor">
+  <StackPanel Spacing="4">
+    <TextBlock Text="{Binding StrategyText}" Classes="muted" />
+    <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+      <TextBlock Text="Name" VerticalAlignment="Center" />
+      <TextBox Grid.Column="1" Name="OperationName" Text="{Binding Name}" />
+
+      <TextBlock Grid.Row="1" Text="Tool" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="1" Grid.Column="1" Name="OperationTool" ItemsSource="{Binding Tools}" SelectedItem="{Binding Tool}" HorizontalAlignment="Stretch">
+        <ComboBox.ItemTemplate>
+          <DataTemplate x:DataType="t:Tool"><TextBlock Text="{Binding Name}" /></DataTemplate>
+        </ComboBox.ItemTemplate>
+      </ComboBox>
+
+      <CheckBox Grid.Row="2" Grid.Column="1" Name="OperationEnabled" Content="Enabled" IsChecked="{Binding Enabled}" />
+    </Grid>
+
+    <TextBlock Text="Passes" Classes="section" />
+    <ContentControl Content="{Binding Stepover}" />
+    <ContentControl Content="{Binding Stepdown}" />
+    <ContentControl Content="{Binding Tolerance}" />
+    <ContentControl Content="{Binding StockToLeave}" />
+    <ContentControl Content="{Binding AxialStockToLeave}" />
+
+    <TextBlock Text="Pattern" Classes="section" />
+    <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto" RowSpacing="4">
+      <TextBlock Text="Cut direction" VerticalAlignment="Center" />
+      <ComboBox Grid.Column="1" Name="OperationDirection" ItemsSource="{x:Static vm:OperationEditor.Directions}"
+                SelectedItem="{Binding Direction}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="1" Text="Clearing pattern" VerticalAlignment="Center" IsVisible="{Binding UsesPattern}" />
+      <ComboBox Grid.Row="1" Grid.Column="1" Name="OperationPattern" ItemsSource="{x:Static vm:OperationEditor.Patterns}"
+                SelectedItem="{Binding Pattern}" IsVisible="{Binding UsesPattern}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="2" Text="Rotary pattern" VerticalAlignment="Center" IsVisible="{Binding IsRotary}" />
+      <ComboBox Grid.Row="2" Grid.Column="1" Name="OperationRotaryPattern" ItemsSource="{x:Static vm:OperationEditor.RotaryPatterns}"
+                SelectedItem="{Binding RotaryPattern}" IsVisible="{Binding IsRotary}" HorizontalAlignment="Stretch" />
+    </Grid>
+    <ContentControl Content="{Binding RasterAngle}" IsVisible="{Binding UsesRasterAngle}" />
+    <ContentControl Content="{Binding PencilPasses}" IsVisible="{Binding IsPencil}" />
+
+    <StackPanel IsVisible="{Binding IsPlanar}" Spacing="4">
+      <TextBlock Text="Area" Classes="section" />
+      <Grid ColumnDefinitions="190,*">
+        <TextBlock Text="Boundary" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" Name="OperationBoundary" ItemsSource="{x:Static vm:OperationEditor.Boundaries}"
+                  SelectedItem="{Binding Boundary}" HorizontalAlignment="Stretch" />
+      </Grid>
+      <ContentControl Content="{Binding BoundaryOffset}" />
+      <ContentControl Content="{Binding MinZ}" />
+      <ContentControl Content="{Binding MaxZ}" />
+    </StackPanel>
+
+    <TextBlock Text="Linking" Classes="section" />
+    <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto" RowSpacing="4">
+      <TextBlock Text="Between passes" VerticalAlignment="Center" />
+      <ComboBox Grid.Column="1" Name="OperationLinking" ItemsSource="{x:Static vm:OperationEditor.Linkings}"
+                SelectedItem="{Binding Linking}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="1" Text="Entry" VerticalAlignment="Center" IsVisible="{Binding UsesEntry}" />
+      <ComboBox Grid.Row="1" Grid.Column="1" Name="OperationEntry" ItemsSource="{x:Static vm:OperationEditor.Entries}"
+                SelectedItem="{Binding Entry}" IsVisible="{Binding UsesEntry}" HorizontalAlignment="Stretch" />
+    </Grid>
+    <ContentControl Content="{Binding RampAngle}" IsVisible="{Binding UsesEntry}" />
+    <ContentControl Content="{Binding LeadRadius}" />
+    <ContentControl Content="{Binding RetractClearance}" />
+  </StackPanel>
+</UserControl>

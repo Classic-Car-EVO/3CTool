@@ -1,0 +1,243 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:t="using:ThreeCTool.Core.Tooling"
+             xmlns:r="using:ThreeCTool.Rendering"
+             x:Class="ThreeCTool.Desktop.Views.MachiningView"
+             x:DataType="vm:MachiningViewModel">
+  <Panel>
+    <TextBlock IsVisible="{Binding HasNoProject}" Classes="muted" Margin="0,12"
+               Text="Create or open a project on the Project page first." />
+
+    <Grid ColumnDefinitions="500,*" IsVisible="{Binding HasProject}" Margin="0,4,0,0">
+      <DockPanel Margin="0,0,12,0">
+        <!-- Generate, feeds, simulate, post -->
+        <Border DockPanel.Dock="Top" Classes="card">
+          <StackPanel Spacing="6">
+            <WrapPanel>
+              <Button Name="Generate" Content="Generate" Command="{Binding GenerateCommand}" Margin="0,0,4,4" />
+              <Button Name="PlanFeeds" Content="Feeds" Command="{Binding PlanFeedsCommand}" Margin="0,0,4,4" />
+              <Button Name="Simulate" Content="Simulate" Command="{Binding SimulateCommand}" Margin="0,0,4,4" />
+              <Button Name="PostGcode" Content="Post" Command="{Binding PostCommand}" Margin="0,0,4,4" />
+              <Button Name="RunAll" Content="Run all" Classes="primary" Command="{Binding RunAllCommand}" Margin="0,0,12,4" />
+              <Button Name="CancelRun" Content="Cancel" Command="{Binding CancelCommand}" Margin="0,0,4,4" />
+            </WrapPanel>
+            <CheckBox Name="OverrideVerification" IsChecked="{Binding OverrideVerification}"
+                      Content="Write G-code even if the simulation found errors" />
+            <StackPanel IsVisible="{Binding IsRunning}" Spacing="2">
+              <TextBlock Name="RunStage" Text="{Binding Stage}" Classes="muted" TextTrimming="CharacterEllipsis" />
+              <ProgressBar Name="RunProgress" Value="{Binding Progress}" Minimum="0" Maximum="100" />
+            </StackPanel>
+            <TextBlock Text="{Binding ToolpathSummary}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+          </StackPanel>
+        </Border>
+
+        <TabControl Name="MachiningTabs">
+          <!-- Setups -->
+          <TabItem Header="Setups">
+            <ScrollViewer IsEnabled="{Binding IsIdle}">
+              <StackPanel Margin="0,4,14,8">
+                <ListBox Name="SetupList" ItemsSource="{Binding Setups}" SelectedItem="{Binding SelectedSetup}">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:SetupRow">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel VerticalAlignment="Center">
+                          <TextBlock Text="{Binding Title}" />
+                          <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4">
+                          <Button Content="Up" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).MoveSetupUpCommand}" CommandParameter="{Binding}" />
+                          <Button Content="Down" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).MoveSetupDownCommand}" CommandParameter="{Binding}" />
+                          <Button Content="Remove" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).RemoveSetupCommand}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <Grid ColumnDefinitions="*,Auto" Margin="0,6,0,0">
+                  <ComboBox Name="NewSetupOrientation" ItemsSource="{x:Static vm:MachiningViewModel.Orientations}" SelectedItem="{Binding NewOrientation}"
+                            HorizontalAlignment="Stretch" />
+                  <Button Grid.Column="1" Name="AddSetup" Content="Add setup" Command="{Binding AddSetupCommand}" Margin="6,0,0,0" />
+                </Grid>
+                <TextBlock Text="Selected setup" Classes="section" IsVisible="{Binding SetupEditor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <ContentControl Content="{Binding SetupEditor}" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- Operations -->
+          <TabItem Header="Operations">
+            <ScrollViewer IsEnabled="{Binding IsIdle}">
+              <StackPanel Margin="0,4,14,8">
+                <Grid ColumnDefinitions="130,*">
+                  <TextBlock Text="Setup" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" Name="OperationSetup" ItemsSource="{Binding Setups}" SelectedItem="{Binding SelectedSetup}" HorizontalAlignment="Stretch">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="vm:SetupRow"><TextBlock Text="{Binding Title}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+                <TextBlock Text="No operations in this setup." Classes="muted" IsVisible="{Binding !Operations.Count}" Margin="0,6" />
+                <ListBox Name="OperationList" ItemsSource="{Binding Operations}" SelectedItem="{Binding SelectedOperation}" Margin="0,6,0,0">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:OperationRow">
+                      <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto">
+                        <CheckBox IsChecked="{Binding Enabled, Mode=OneWay}" VerticalAlignment="Top" ToolTip.Tip="Enabled"
+                                  Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).ToggleOperationCommand}" CommandParameter="{Binding}" />
+                        <StackPanel Grid.Column="1">
+                          <TextBlock Text="{Binding Title}" />
+                          <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" />
+                          <TextBlock Text="{Binding Status}" Classes="muted" FontSize="12" IsVisible="{Binding HasStatus}" />
+                          <TextBlock Text="{Binding Warning}" Classes="warning" FontSize="12" IsVisible="{Binding HasWarning}" />
+                        </StackPanel>
+                        <StackPanel Grid.Row="1" Grid.Column="1" Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
+                          <Button Content="Up" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).MoveOperationUpCommand}" CommandParameter="{Binding}" />
+                          <Button Content="Down" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).MoveOperationDownCommand}" CommandParameter="{Binding}" />
+                          <Button Content="Duplicate" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).DuplicateOperationCommand}" CommandParameter="{Binding}" />
+                          <Button Content="Remove" Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).RemoveOperationCommand}" CommandParameter="{Binding}" />
+                        </StackPanel>
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+
+                <TextBlock Text="Add an operation" Classes="section" />
+                <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto">
+                  <TextBlock Text="Strategy" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" Name="NewStrategy" ItemsSource="{x:Static vm:MachiningViewModel.Strategies}" SelectedItem="{Binding NewStrategy}"
+                            HorizontalAlignment="Stretch" />
+                  <TextBlock Grid.Row="1" Text="Tool" VerticalAlignment="Center" />
+                  <ComboBox Grid.Row="1" Grid.Column="1" Name="NewTool" ItemsSource="{Binding Tools}" SelectedItem="{Binding NewTool}"
+                            PlaceholderText="Add tools on the Project page" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate x:DataType="t:Tool"><TextBlock Text="{Binding Name}" /></DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+                <Button Name="AddOperation" Content="Add operation" Command="{Binding AddOperationCommand}" Margin="0,6,0,0" />
+
+                <TextBlock Text="Selected operation" Classes="section" IsVisible="{Binding OperationEditor, Converter={x:Static ObjectConverters.IsNotNull}}" />
+                <ContentControl Content="{Binding OperationEditor}" />
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- Feeds -->
+          <TabItem Header="Feeds">
+            <ScrollViewer>
+              <StackPanel Margin="0,4,14,8">
+                <TextBlock Text="No enabled operations." Classes="muted" IsVisible="{Binding !Feeds.Count}" />
+                <ItemsControl Name="FeedList" ItemsSource="{Binding Feeds}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FeedRow">
+                      <Border Classes="card">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" />
+                          <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Limit}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                          <TextBlock Text="{Binding Warnings}" Classes="warning" FontSize="12" IsVisible="{Binding HasWarnings}" />
+                        </StackPanel>
+                      </Border>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- Verification -->
+          <TabItem Header="Verification">
+            <ScrollViewer>
+              <StackPanel Margin="0,4,14,8" Spacing="4">
+                <TextBlock Text="Not simulated yet." Classes="muted" IsVisible="{Binding !HasSimulation}" />
+                <TextBlock Name="SimulationSummary" Text="{Binding SimulationSummary}" TextWrapping="Wrap" />
+                <TextBlock Text="The project changed since this simulation; simulate again." Classes="warning" IsVisible="{Binding SimulationIsStale}" />
+                <TextBlock Text="Errors block the G-code unless you override them." Classes="error" IsVisible="{Binding BlocksOutput}" />
+                <TextBlock Text="{Binding DeviationSummary}" Classes="muted" TextWrapping="Wrap" />
+                <ItemsControl Name="IssueList" ItemsSource="{Binding Issues}">
+                  <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:IssueRow">
+                      <Button HorizontalAlignment="Stretch" HorizontalContentAlignment="Left" Margin="0,2"
+                              Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).ShowIssueCommand}" CommandParameter="{Binding}">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" Classes.error="{Binding IsError}" Classes.warning="{Binding IsWarning}" />
+                          <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                      </Button>
+                    </DataTemplate>
+                  </ItemsControl.ItemTemplate>
+                </ItemsControl>
+              </StackPanel>
+            </ScrollViewer>
+          </TabItem>
+
+          <!-- G-code -->
+          <TabItem Header="G-code">
+            <DockPanel Margin="0,4,14,8">
+              <StackPanel DockPanel.Dock="Top" Spacing="4">
+                <TextBlock Text="Nothing posted yet." Classes="muted" IsVisible="{Binding !Files.Count}" />
+                <ListBox Name="GcodeFiles" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="220">
+                  <ListBox.ItemTemplate>
+                    <DataTemplate x:DataType="vm:GcodeRow">
+                      <Grid ColumnDefinitions="*,Auto">
+                        <StackPanel>
+                          <TextBlock Text="{Binding Title}" />
+                          <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+                        </StackPanel>
+                        <Button Grid.Column="1" Content="Save as..." VerticalAlignment="Center"
+                                Command="{Binding $parent[UserControl].((vm:MachiningViewModel)DataContext).SaveFileCommand}" CommandParameter="{Binding}" />
+                      </Grid>
+                    </DataTemplate>
+                  </ListBox.ItemTemplate>
+                </ListBox>
+                <Button Name="ExportGcode" Content="Copy all files to a folder..." Command="{Binding ExportFilesCommand}" />
+              </StackPanel>
+              <TextBox Name="GcodePreview" Text="{Binding Preview}" IsReadOnly="True" AcceptsReturn="True" FontFamily="monospace" FontSize="12"
+                       Margin="0,6,0,0" TextWrapping="NoWrap" />
+            </DockPanel>
+          </TabItem>
+        </TabControl>
+      </DockPanel>
+
+      <!-- 3D view and playback -->
+      <DockPanel Grid.Column="1">
+        <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+          <Button Content="Iso" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Iso}" Margin="0,0,4,4" />
+          <Button Content="Top" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Top}" Margin="0,0,4,4" />
+          <Button Content="Front" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Front}" Margin="0,0,4,4" />
+          <Button Content="Right" Command="{Binding Scene.SetViewCommand}" CommandParameter="{x:Static r:CameraView.Right}" Margin="0,0,4,4" />
+          <Button Content="Fit" Command="{Binding Scene.FitCommand}" Margin="0,0,16,4" />
+          <CheckBox Content="Part" IsChecked="{Binding Scene.ShowPart}" Margin="0,0,8,4" />
+          <CheckBox Content="Stock" IsChecked="{Binding Scene.ShowStock}" Margin="0,0,8,4" />
+          <CheckBox Content="Keep-outs" IsChecked="{Binding Scene.ShowKeepOuts}" Margin="0,0,8,4" />
+          <CheckBox Content="Toolpaths" IsChecked="{Binding Scene.ShowToolpaths}" Margin="0,0,8,4" />
+          <CheckBox Content="Rapids" IsChecked="{Binding Scene.ShowRapids}" Margin="0,0,8,4" />
+          <CheckBox Content="Simulation" IsChecked="{Binding Scene.ShowSimulation}" Margin="0,0,8,4" />
+        </WrapPanel>
+
+        <Border DockPanel.Dock="Bottom" Classes="card" IsVisible="{Binding Playback.IsAvailable}">
+          <StackPanel Spacing="4">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
+              <Button Content="|&lt;" Command="{Binding Playback.ToStartCommand}" ToolTip.Tip="Start" Margin="0,0,4,0" />
+              <Button Content="&lt;&lt;" Command="{Binding Playback.PreviousStepCommand}" ToolTip.Tip="Previous operation" Margin="0,0,4,0" />
+              <Button Name="PlayPause" Content="Play/Pause" Command="{Binding Playback.PlayPauseCommand}" Margin="0,0,4,0" />
+              <Button Content="&gt;&gt;" Command="{Binding Playback.NextStepCommand}" ToolTip.Tip="Next operation" Margin="0,0,4,0" />
+              <Button Content="&gt;|" Command="{Binding Playback.ToEndCommand}" ToolTip.Tip="End" Margin="0,0,8,0" />
+              <Slider Grid.Column="5" Name="PlaybackTime" Minimum="0" Maximum="{Binding Playback.Duration}" Value="{Binding Playback.Time}" VerticalAlignment="Center" />
+              <ComboBox Grid.Column="6" ItemsSource="{x:Static vm:PlaybackViewModel.Speeds}" SelectedItem="{Binding Playback.Speed}" Margin="8,0,0,0" />
+            </Grid>
+            <Grid ColumnDefinitions="*,Auto">
+              <TextBlock Name="PlaybackPosition" Text="{Binding Playback.PositionText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
+              <CheckBox Grid.Column="1" Name="ShowDeviation" Content="Deviation heatmap" IsChecked="{Binding Playback.ShowDeviation}" IsEnabled="{Binding Playback.HasDeviation}" />
+            </Grid>
+          </StackPanel>
+        </Border>
+        <TextBlock DockPanel.Dock="Bottom" Classes="muted" FontSize="12" Margin="0,4,0,0"
+                   Text="Drag to orbit, right-drag or middle-drag to pan, wheel to zoom." />
+        <Border BorderBrush="#40808080" BorderThickness="1" ClipToBounds="True">
+          <r:CamView Name="MachiningScene" Scene="{Binding Scene.Scene}" Renderer="{Binding Renderer}" />
+        </Border>
+      </DockPanel>
+    </Grid>
+  </Panel>
+</UserControl>

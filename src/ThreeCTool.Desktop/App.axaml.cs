@@ -25,6 +25,7 @@ public partial class App : Application
             desktop.MainWindow = window;
             desktop.Exit += (_, _) =>
             {
+                viewModel.Dispose();
                 viewModel.Workspace.Session?.DisposeAsync().AsTask().GetAwaiter().GetResult();
                 services.Dispose();
             };
