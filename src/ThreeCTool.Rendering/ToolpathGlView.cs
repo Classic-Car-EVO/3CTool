@@ -13,7 +13,7 @@ namespace ThreeCTool.Rendering;
 
 /// <summary>OpenGL (ES 3.0 / 3.3 core) view of a <see cref="ToolpathScene"/>.</summary>
 [SuppressMessage("Design", "CA1001", Justification = "GL resources are released in OnOpenGlDeinit, while the context is current.")]
-public sealed class ToolpathGlView : OpenGlControlBase
+public sealed class ToolpathGlView : OpenGlControlBase, ISceneGlControl
 {
     public static readonly StyledProperty<ToolpathScene?> SceneProperty =
         AvaloniaProperty.Register<ToolpathGlView, ToolpathScene?>(nameof(Scene));
