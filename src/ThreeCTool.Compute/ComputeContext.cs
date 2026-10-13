@@ -3,6 +3,8 @@ using System.Collections.Concurrent;
 using ILGPU;
 using ILGPU.Runtime;
 
+using ThreeCTool.Compute.Kernels;
+
 namespace ThreeCTool.Compute;
 
 public enum ComputeBackend
@@ -21,6 +23,7 @@ public sealed class ComputeContext : IDisposable
 
     private readonly Context _context;
     private readonly ConcurrentDictionary<System.Reflection.MethodInfo, Delegate> _kernels = new();
+    private readonly Lock _compileGate = new();
 
     private ComputeContext(Context context, Accelerator accelerator, ComputeDeviceInfo device)
     {
@@ -99,10 +102,50 @@ public sealed class ComputeContext : IDisposable
         where T : unmanaged =>
         source.CopyTo(Accelerator.DefaultStream, target);
 
+    /// <summary>Every kernel of the compute layer, for <see cref="PrepareKernels"/>.</summary>
+    internal static IReadOnlyList<Action<ComputeContext>> AllKernels { get; } =
+    [
+        c => c.Kernel<CollisionMeshArgs>(CollisionKernel.AgainstMesh),
+        c => c.Kernel<CollisionStockArgs>(CollisionKernel.AgainstStock),
+        c => c.Kernel<DexelMeshArgs>(DexelKernel.FromMesh),
+        c => c.Kernel<DexelSweepArgs>(DexelKernel.Sweep),
+        c => c.Kernel<DistanceTransformArgs>(DistanceTransformKernel.Run),
+        c => c.Kernel<DropCutterArgs>(DropCutterKernel.Run),
+        c => c.Kernel<EngagementArgs>(EngagementKernel.Engagement),
+        c => c.Kernel<RasterRemoveArgs>(EngagementKernel.Remove),
+        c => c.Kernel<HeightfieldOffsetArgs>(HeightfieldKernel.Offset),
+        c => c.Kernel<RaycastArgs>(MeshQueryKernels.Raycast),
+        c => c.Kernel<ClosestPointArgs>(MeshQueryKernels.ClosestPoint),
+        c => c.Kernel<PushCutterArgs>(PushCutterKernel.Run),
+    ];
+
+    /// <summary>Compiles every kernel now, so a device whose driver rejects one fails up front instead of mid-job.</summary>
+    public void PrepareKernels()
+    {
+        foreach (var load in AllKernels)
+        {
+            load(this);
+        }
+    }
+
     /// <summary>Compiled kernel for <paramref name="method"/>, cached per accelerator.</summary>
     internal Action<Index1D, T> Kernel<T>(Action<Index1D, T> method)
         where T : struct =>
-        (Action<Index1D, T>)_kernels.GetOrAdd(method.Method, _ => Accelerator.LoadAutoGroupedStreamKernel(method));
+        (Action<Index1D, T>)_kernels.GetOrAdd(method.Method, _ => LoadKernel(method));
+
+    private Action<Index1D, T> LoadKernel<T>(Action<Index1D, T> method)
+        where T : struct
+    {
+        lock (_compileGate)
+        {
+            // ILGPU reuses IR of methods shared with previously compiled kernels (e.g. CutterProfile members), and on
+            // OpenCL that reused IR can generate invalid C (a nested struct's address typed as its first float field),
+            // so whichever of the dexel sweep and drop cutter kernels compiled second failed to build. Compiling each
+            // kernel from a clean IR context avoids it; compiled kernels stay loaded.
+            _context.ClearCache(ClearCacheMode.Everything);
+            return Accelerator.LoadAutoGroupedStreamKernel(method);
+        }
+    }
 
     private static ComputeBackend? ToBackend(AcceleratorType type) => type switch
     {

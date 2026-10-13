@@ -27,6 +27,26 @@ public class GpuKernelTests(ITestOutputHelper output)
         Assert.NotEqual(ComputeBackend.Cpu, compute.Device.Backend);
     }
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void AllKernelsBuildInOneContext(bool reversed)
+    {
+        // Kernels sharing code (e.g. CutterProfile) used to break the OpenCL build of whichever compiled second.
+        foreach (var backend in ComputeContext.ListDevices().Select(d => d.Backend).Where(b => b != ComputeBackend.Cpu).Distinct())
+        {
+            using var compute = ComputeContext.Create(backend);
+            Assert.Equal(backend, compute.Device.Backend);
+            var kernels = reversed ? ComputeContext.AllKernels.Reverse() : ComputeContext.AllKernels;
+            foreach (var load in kernels)
+            {
+                load(compute);
+            }
+
+            output.WriteLine($"{compute.Device}: {ComputeContext.AllKernels.Count} kernels built");
+        }
+    }
+
     [Fact]
     public void GpuKernelMatchesCpuReference()
     {

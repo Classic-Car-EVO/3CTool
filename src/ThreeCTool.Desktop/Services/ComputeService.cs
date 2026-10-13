@@ -23,6 +23,28 @@ public sealed class ComputeService(ComputeBackend? preferred = null) : IDisposab
     /// <summary>Error of the last failed context creation (shown on the diagnostics page).</summary>
     public string? LastError { get; private set; }
 
+    /// <summary>Creates the context for a preference; replaceable by tests.</summary>
+    internal Func<ComputeBackend?, ComputeContext> Factory { get; init; } = CreateReady;
+
+    private static ComputeContext CreateReady(ComputeBackend? backend)
+    {
+        var created = ComputeContext.Create(backend);
+        try
+        {
+            if (created.Device.Backend != ComputeBackend.Cpu)
+            {
+                created.PrepareKernels();
+            }
+
+            return created;
+        }
+        catch
+        {
+            created.Dispose();
+            throw;
+        }
+    }
+
     public static IReadOnlyList<ComputeDeviceInfo> ListDevices()
     {
         try
@@ -45,13 +67,13 @@ public sealed class ComputeService(ComputeBackend? preferred = null) : IDisposab
             {
                 try
                 {
-                    context = await Task.Run(() => ComputeContext.Create(Preferred), cancellationToken).ConfigureAwait(false);
+                    context = await Task.Run(() => Factory(Preferred), cancellationToken).ConfigureAwait(false);
                     LastError = null;
                 }
-                catch (Exception ex) when (Preferred is not null and not ComputeBackend.Cpu && ex is not OperationCanceledException)
+                catch (Exception ex) when (Preferred is not ComputeBackend.Cpu && ex is not OperationCanceledException)
                 {
-                    // A broken driver must not make the application unusable.
-                    LastError = $"{Preferred}: {ex.Message}; using CPU";
+                    // A broken driver (no device, or a kernel it cannot build) must not make the application unusable.
+                    LastError = $"{Preferred?.ToString() ?? "Auto"}: {ex.GetType().Name}: {ex.Message}; using CPU";
                     context = await Task.Run(() => ComputeContext.Create(ComputeBackend.Cpu), cancellationToken).ConfigureAwait(false);
                 }
             }

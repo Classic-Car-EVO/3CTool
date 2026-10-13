@@ -157,11 +157,16 @@ public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
         or NotSupportedException
         or ArgumentException
         or DbException
-        or DbUpdateException;
+        or DbUpdateException
+        or ILGPU.Runtime.AcceleratorException
+        or ILGPU.InternalCompilerException
+        or ILGPU.Backends.InvalidCodeGenerationException;
 
     private static string Describe(Exception ex) => ex switch
     {
         DbUpdateException { InnerException: { } inner } => "Could not save to the library: " + inner.Message,
+        ILGPU.Runtime.AcceleratorException or ILGPU.InternalCompilerException or ILGPU.Backends.InvalidCodeGenerationException =>
+            $"The compute device failed ({ex.GetType().Name}). Select the CPU backend in Settings and try again.",
         _ => ex.Message,
     };
 
