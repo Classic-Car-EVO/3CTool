@@ -1,0 +1,68 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             xmlns:r="using:ThreeCTool.Rendering"
+             x:Class="ThreeCTool.Feeder.Views.RunView"
+             x:DataType="vm:RunViewModel">
+  <Grid ColumnDefinitions="*,8,320">
+    <Grid RowDefinitions="*,Auto">
+      <Border CornerRadius="8" ClipToBounds="True">
+        <r:ToolpathView Name="Preview" Scene="{Binding Scene}" Renderer="{Binding Renderer}" />
+      </Border>
+      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="4" Margin="0,4,0,0">
+        <Button Content="Iso" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Iso}" />
+        <Button Content="Top" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Top}" />
+        <Button Content="Front" Command="{Binding SetViewCommand}" CommandParameter="{x:Static r:CameraView.Front}" />
+      </StackPanel>
+    </Grid>
+
+    <Grid Grid.Column="2" RowDefinitions="*,Auto">
+      <ScrollViewer>
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding JobName}" Classes="title" TextTrimming="CharacterEllipsis" />
+          <Grid ColumnDefinitions="*,Auto">
+            <TextBlock Name="StateText" Text="{Binding State}" FontSize="18" />
+            <TextBlock Grid.Column="1" Text="{Binding LineText}" Classes="label" VerticalAlignment="Center" />
+          </Grid>
+          <Grid ColumnDefinitions="*,Auto" IsVisible="{Binding HasJob}">
+            <ProgressBar Value="{Binding ProgressPercent}" Minimum="0" Maximum="100" Height="14" VerticalAlignment="Center" />
+            <TextBlock Grid.Column="1" Text="{Binding ProgressText}" Margin="8,0,0,0" FontSize="16" />
+          </Grid>
+          <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto" IsVisible="{Binding HasJob}">
+            <TextBlock Text="Elapsed" Classes="label" Margin="0,0,8,0" />
+            <TextBlock Grid.Column="1" Text="{Binding ElapsedText}" />
+            <TextBlock Grid.Row="1" Text="Remaining" Classes="label" Margin="0,0,8,0" />
+            <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding RemainingText}" />
+            <TextBlock Grid.Row="2" Text="Spindle" Classes="label" Margin="0,0,8,0" />
+            <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SpindleText}" />
+          </Grid>
+          <TextBlock Text="{Binding Message}" TextWrapping="Wrap" Foreground="{StaticResource WarningBrush}" FontSize="14" />
+          <TextBlock Text="{Binding Warnings}" TextWrapping="Wrap" Foreground="{StaticResource WarningBrush}" FontSize="14" />
+
+          <Grid ColumnDefinitions="Auto,*,Auto,Auto" Margin="0,4,0,0" IsVisible="{Binding IsActive}">
+            <Button Name="FeedDown" Content="−10" Command="{Binding FeedDownCommand}" />
+            <TextBlock Grid.Column="1" Text="{Binding FeedOverride, StringFormat='Feed {0}%'}" FontSize="18"
+                       HorizontalAlignment="Center" VerticalAlignment="Center" />
+            <Button Grid.Column="2" Name="FeedUp" Content="+10" Command="{Binding FeedUpCommand}" Margin="0,0,4,0" />
+            <Button Grid.Column="3" Content="100%" Command="{Binding FeedResetCommand}" />
+          </Grid>
+          <Button Content="Spindle RPM changed..." Command="{Binding EditRpmCommand}" HorizontalAlignment="Stretch"
+                  IsVisible="{Binding IsActive}" />
+
+          <Border Classes="panel" IsVisible="{Binding RecoveryAvailable}" Margin="0,4,0,0">
+            <StackPanel Spacing="6">
+              <TextBlock Text="The last run was interrupted and can be recovered." TextWrapping="Wrap" />
+              <Button Name="RecoverButton" Content="Recover..." Classes="primary" HorizontalAlignment="Stretch" Command="{Binding RecoverCommand}" />
+            </StackPanel>
+          </Border>
+        </StackPanel>
+      </ScrollViewer>
+
+      <Grid Grid.Row="1" ColumnDefinitions="*,*,*" Margin="0,6,0,0">
+        <Button Name="PauseButton" Content="Pause" Command="{Binding PauseCommand}" HorizontalAlignment="Stretch" MinHeight="60" Margin="0,0,4,0" />
+        <Button Grid.Column="1" Name="ResumeButton" Content="Resume" Classes="primary" Command="{Binding ResumeCommand}" HorizontalAlignment="Stretch" MinHeight="60" Margin="0,0,4,0" />
+        <Button Grid.Column="2" Name="StopButton" Content="Stop" Classes="danger" Command="{Binding StopCommand}" HorizontalAlignment="Stretch" MinHeight="60" />
+      </Grid>
+    </Grid>
+  </Grid>
+</UserControl>

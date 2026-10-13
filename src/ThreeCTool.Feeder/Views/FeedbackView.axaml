@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             x:Class="ThreeCTool.Feeder.Views.FeedbackView"
+             x:DataType="vm:FeedbackViewModel">
+  <UserControl.Resources>
+    <DataTemplate x:Key="ChoiceRow" x:DataType="vm:ChoiceGroup">
+      <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" FontSize="16" TextWrapping="Wrap" />
+        <ItemsControl Grid.Column="1" ItemsSource="{Binding Items}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ChoiceItem">
+              <Button Content="{Binding Label}" Command="{Binding SelectCommand}" Classes.selected="{Binding IsSelected}" MinWidth="52" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </Grid>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Border Classes="dialog" MinWidth="680">
+    <Grid RowDefinitions="Auto,*,Auto">
+      <StackPanel>
+        <TextBlock Text="{Binding JobName, StringFormat='How did {0} go?'}" Classes="title" TextTrimming="CharacterEllipsis" />
+        <TextBlock Text="{Binding FinalState}" Classes="label" />
+      </StackPanel>
+      <ScrollViewer Grid.Row="1" Margin="0,6">
+        <StackPanel Spacing="2">
+          <ContentControl Content="{Binding Finish}" ContentTemplate="{StaticResource ChoiceRow}" />
+          <ContentControl Content="{Binding Chatter}" ContentTemplate="{StaticResource ChoiceRow}" />
+          <ContentControl Content="{Binding Wear}" ContentTemplate="{StaticResource ChoiceRow}" />
+          <ContentControl Content="{Binding WearEvent}" ContentTemplate="{StaticResource ChoiceRow}" />
+          <Button Name="EditNotes" Content="{Binding NotesText}" Command="{Binding EditNotesCommand}" HorizontalAlignment="Stretch"
+                  HorizontalContentAlignment="Left" Margin="0,4,0,0" />
+        </StackPanel>
+      </ScrollViewer>
+      <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <Button Name="Skip" Content="Skip" Command="{Binding SkipCommand}" MinWidth="120" />
+        <Button Name="Submit" Content="Submit" Classes="primary" Command="{Binding SubmitCommand}" MinWidth="160" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

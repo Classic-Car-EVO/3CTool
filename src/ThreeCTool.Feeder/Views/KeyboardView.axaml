@@ -1,0 +1,39 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             x:Class="ThreeCTool.Feeder.Views.KeyboardView"
+             x:DataType="vm:KeyboardViewModel">
+  <Border Classes="dialog" MaxHeight="470" Padding="10">
+    <StackPanel Spacing="4">
+      <TextBlock Text="{Binding Title}" Classes="label" FontSize="16" />
+      <Border Background="#0D1013" CornerRadius="4" Padding="8,4" MinHeight="44">
+        <TextBlock Name="Text" Text="{Binding Text}" FontSize="22" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+      </Border>
+      <ItemsControl ItemsSource="{Binding Rows}" HorizontalAlignment="Center">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate>
+            <ItemsControl ItemsSource="{Binding}" HorizontalAlignment="Center">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="x:String">
+                  <Button Classes="key" Content="{Binding}" CommandParameter="{Binding}"
+                          Command="{Binding $parent[UserControl].((vm:KeyboardViewModel)DataContext).PressCommand}" />
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+        <Button Classes="key" Content="Shift" Command="{Binding ToggleShiftCommand}" IsVisible="{Binding Letters}" Classes.selected="{Binding Shift}" />
+        <Button Grid.Column="1" Classes="key" Content="Space" Command="{Binding SpaceCommand}" HorizontalAlignment="Stretch" IsVisible="{Binding Letters}" />
+        <Button Grid.Column="2" Classes="key" Content="⌫" Command="{Binding BackspaceCommand}" />
+        <Button Grid.Column="3" Classes="key" Content="Clear" Command="{Binding ClearCommand}" />
+        <Button Grid.Column="4" Classes="key" Content="Cancel" Command="{Binding CancelCommand}" />
+        <Button Grid.Column="5" Classes="key primary" Name="Accept" Content="OK" MinWidth="90" Command="{Binding AcceptCommand}" />
+      </Grid>
+    </StackPanel>
+  </Border>
+</UserControl>

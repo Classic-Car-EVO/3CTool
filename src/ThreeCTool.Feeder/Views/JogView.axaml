@@ -1,0 +1,81 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             x:Class="ThreeCTool.Feeder.Views.JogView"
+             x:DataType="vm:JogViewModel">
+  <UserControl.Resources>
+    <DataTemplate x:Key="ChoiceRow" x:DataType="vm:ChoiceGroup">
+      <StackPanel Spacing="2">
+        <TextBlock Text="{Binding Label}" Classes="label" />
+        <ItemsControl ItemsSource="{Binding Items}">
+          <ItemsControl.ItemsPanel>
+            <ItemsPanelTemplate><StackPanel Orientation="Horizontal" Spacing="4" /></ItemsPanelTemplate>
+          </ItemsControl.ItemsPanel>
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:ChoiceItem">
+              <Button Content="{Binding Label}" Command="{Binding SelectCommand}" Classes.selected="{Binding IsSelected}" MinWidth="64" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </DataTemplate>
+  </UserControl.Resources>
+
+  <Grid ColumnDefinitions="Auto,12,*">
+    <StackPanel Spacing="6">
+      <Grid Name="Pad" ColumnDefinitions="Auto,Auto,Auto,16,Auto,8,Auto" RowDefinitions="Auto,Auto,Auto">
+        <Grid.Styles>
+          <Style Selector="Button.jog"><Setter Property="Margin" Value="2" /></Style>
+        </Grid.Styles>
+        <Button Grid.Row="0" Grid.Column="1" Classes="jog" Content="Y+" Tag="Y+" Command="{Binding JogCommand}" CommandParameter="Y+" />
+        <Button Grid.Row="1" Grid.Column="0" Classes="jog" Content="X−" Tag="X-" Command="{Binding JogCommand}" CommandParameter="X-" />
+        <Button Grid.Row="1" Grid.Column="1" Content="Stop" Classes="danger" Margin="2" MinWidth="68" Command="{Binding CancelJogCommand}" />
+        <Button Grid.Row="1" Grid.Column="2" Classes="jog" Content="X+" Tag="X+" Command="{Binding JogCommand}" CommandParameter="X+" />
+        <Button Grid.Row="2" Grid.Column="1" Classes="jog" Content="Y−" Tag="Y-" Command="{Binding JogCommand}" CommandParameter="Y-" />
+        <Button Grid.Row="0" Grid.Column="4" Classes="jog" Content="Z+" Tag="Z+" Command="{Binding JogCommand}" CommandParameter="Z+" />
+        <Button Grid.Row="2" Grid.Column="4" Classes="jog" Content="Z−" Tag="Z-" Command="{Binding JogCommand}" CommandParameter="Z-" />
+        <Button Grid.Row="0" Grid.Column="6" Classes="jog" Content="A+" Tag="A+" Command="{Binding JogCommand}" CommandParameter="A+" />
+        <Button Grid.Row="2" Grid.Column="6" Classes="jog" Content="A−" Tag="A-" Command="{Binding JogCommand}" CommandParameter="A-" />
+      </Grid>
+      <ToggleSwitch IsChecked="{Binding Continuous}" OnContent="Hold to jog" OffContent="Step jog" />
+      <ContentControl Content="{Binding Step}" ContentTemplate="{StaticResource ChoiceRow}" IsVisible="{Binding !Continuous}" />
+      <ContentControl Content="{Binding Feed}" ContentTemplate="{StaticResource ChoiceRow}" />
+    </StackPanel>
+
+    <ScrollViewer Grid.Column="2">
+      <StackPanel Spacing="6">
+        <Grid ColumnDefinitions="Auto,*,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto">
+          <TextBlock Grid.Column="1" Text="Work" Classes="label" HorizontalAlignment="Right" />
+          <TextBlock Grid.Column="2" Text="Machine" Classes="label" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="1" Text="X" Classes="value" />
+          <TextBlock Grid.Row="1" Grid.Column="1" Name="WorkX" Text="{Binding Work.X}" Classes="value" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding Machine.X}" Classes="value" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="2" Text="Y" Classes="value" />
+          <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding Work.Y}" Classes="value" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding Machine.Y}" Classes="value" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="3" Text="Z" Classes="value" />
+          <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding Work.Z}" Classes="value" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="3" Grid.Column="2" Text="{Binding Machine.Z}" Classes="value" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="4" Text="A" Classes="value" />
+          <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding Work.A}" Classes="value" HorizontalAlignment="Right" />
+          <TextBlock Grid.Row="4" Grid.Column="2" Text="{Binding Machine.A}" Classes="value" Foreground="{StaticResource MutedBrush}" HorizontalAlignment="Right" />
+        </Grid>
+
+        <TextBlock Text="Set work zero" Classes="label" />
+        <UniformGrid Columns="5">
+          <Button Content="X" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ZeroCommand}" CommandParameter="X" />
+          <Button Content="Y" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ZeroCommand}" CommandParameter="Y" />
+          <Button Content="Z" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ZeroCommand}" CommandParameter="Z" />
+          <Button Content="A" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ZeroCommand}" CommandParameter="A" />
+          <Button Content="XY" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ZeroCommand}" CommandParameter="XY" />
+        </UniformGrid>
+        <UniformGrid Columns="2">
+          <Button Content="Probe Z (plate)" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ProbeCommand}" />
+          <Button Content="Home" Margin="2" HorizontalAlignment="Stretch" Command="{Binding HomeCommand}" />
+          <Button Content="Unlock" Margin="2" HorizontalAlignment="Stretch" Command="{Binding UnlockCommand}" />
+          <Button Content="Reset" Classes="danger" Margin="2" HorizontalAlignment="Stretch" Command="{Binding ResetCommand}" />
+        </UniformGrid>
+      </StackPanel>
+    </ScrollViewer>
+  </Grid>
+</UserControl>

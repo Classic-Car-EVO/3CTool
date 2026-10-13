@@ -1,0 +1,30 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Feeder.ViewModels"
+             x:Class="ThreeCTool.Feeder.Views.RecoveryView"
+             x:DataType="vm:RecoveryViewModel">
+  <Border Classes="dialog" MinWidth="560">
+    <Grid RowDefinitions="Auto,*,Auto">
+      <TextBlock Text="{Binding JobName, StringFormat='Recover {0}'}" Classes="title" TextTrimming="CharacterEllipsis" />
+      <ScrollViewer Grid.Row="1" Margin="0,8">
+        <StackPanel Spacing="4">
+          <TextBlock Text="{Binding Interruption}" TextWrapping="Wrap" FontSize="17" />
+          <TextBlock Text="{Binding LinesText}" TextWrapping="Wrap" />
+          <TextBlock Text="{Binding Action}" TextWrapping="Wrap" Classes="label" />
+          <ItemsControl ItemsSource="{Binding Notes}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding StringFormat='• {0}'}" TextWrapping="Wrap" FontSize="15" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+      </ScrollViewer>
+      <Grid Grid.Row="2" ColumnDefinitions="Auto,*,Auto,Auto">
+        <Button Name="Discard" Content="Discard" Classes="danger" Command="{Binding DiscardCommand}" />
+        <Button Grid.Column="2" Content="Later" Command="{Binding CloseCommand}" Margin="0,0,8,0" />
+        <Button Grid.Column="3" Name="Start" Content="Start recovery" Classes="primary" Command="{Binding StartCommand}" />
+      </Grid>
+    </Grid>
+  </Border>
+</UserControl>
