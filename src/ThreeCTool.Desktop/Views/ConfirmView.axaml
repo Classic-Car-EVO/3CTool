@@ -1,0 +1,18 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             x:Class="ThreeCTool.Desktop.Views.ConfirmView"
+             x:DataType="vm:ConfirmViewModel">
+  <Border Background="{DynamicResource SystemControlBackgroundAltHighBrush}" CornerRadius="8" Padding="20" MinWidth="380" MaxWidth="560"
+          BorderBrush="#60808080" BorderThickness="1">
+    <StackPanel Spacing="14">
+      <TextBlock Text="{Binding Title}" Classes="title" />
+      <TextBlock Text="{Binding Message}" TextWrapping="Wrap" />
+      <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8">
+        <Button Name="ConfirmCancel" Content="Cancel" Command="{Binding CancelCommand}" IsCancel="True" />
+        <Button Name="ConfirmOk" Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}" IsDefault="True"
+                Classes="primary" Classes.danger="{Binding IsDanger}" />
+      </StackPanel>
+    </StackPanel>
+  </Border>
+</UserControl>

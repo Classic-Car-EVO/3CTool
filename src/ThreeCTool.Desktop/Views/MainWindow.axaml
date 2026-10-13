@@ -1,21 +1,47 @@
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
-        xmlns:r="using:ThreeCTool.Rendering"
-        xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-        xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
         x:Class="ThreeCTool.Desktop.Views.MainWindow"
         x:DataType="vm:MainViewModel"
         Icon="/Assets/avalonia-logo.ico"
+        Width="1400" Height="900" MinWidth="1000" MinHeight="640"
         Title="3C Tool">
 
-    <Design.DataContext>
-        <!-- This only sets the DataContext for the previewer in an IDE,
-             to set the actual DataContext for runtime, set the DataContext property in code (look at App.axaml.cs) -->
-        <vm:MainViewModel />
-    </Design.DataContext>
+  <Grid RowDefinitions="*,Auto">
+    <Grid ColumnDefinitions="150,*">
+      <!-- Page navigation -->
+      <Border BorderBrush="#40808080" BorderThickness="0,0,1,0">
+        <DockPanel>
+          <TextBlock DockPanel.Dock="Top" Text="3C Tool" Classes="title" Margin="14,12" />
+          <ProgressBar DockPanel.Dock="Bottom" IsIndeterminate="True" IsVisible="{Binding IsBusy}" Margin="10" />
+          <ListBox Name="Navigation" ItemsSource="{Binding Pages}" SelectedItem="{Binding SelectedPage}" Background="Transparent">
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="vm:PageViewModel">
+                <TextBlock Text="{Binding Title}" FontSize="15" Margin="4,6" />
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </Border>
 
-    <r:Viewport3D />
+      <ContentControl Grid.Column="1" Name="PageHost" Content="{Binding SelectedPage}" Margin="12,8,12,8" />
+    </Grid>
 
+    <!-- Messages and errors -->
+    <Border Grid.Row="1" Name="MessageBar" Padding="12,6" Background="#2E3A46" IsVisible="{Binding HasMessage}"
+            Classes.error="{Binding MessageIsError}">
+      <Border.Styles>
+        <Style Selector="Border.error"><Setter Property="Background" Value="#7F1D1D" /></Style>
+      </Border.Styles>
+      <Grid ColumnDefinitions="*,Auto">
+        <SelectableTextBlock Text="{Binding Message}" Foreground="White" TextWrapping="Wrap" VerticalAlignment="Center" />
+        <Button Grid.Column="1" Name="DismissMessage" Content="Dismiss" Command="{Binding DismissMessageCommand}" />
+      </Grid>
+    </Border>
+
+    <!-- Modal confirmations -->
+    <Border Grid.RowSpan="2" Background="#A0000000" IsVisible="{Binding HasOverlay}">
+      <ContentControl Name="OverlayHost" Content="{Binding Overlay}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+    </Border>
+  </Grid>
 </Window>

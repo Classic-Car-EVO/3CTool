@@ -1,0 +1,13 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             x:Class="ThreeCTool.Desktop.Views.LibraryView"
+             x:DataType="vm:LibraryViewModel">
+  <TabControl Name="LibraryTabs" ItemsSource="{Binding Sections}" SelectedItem="{Binding SelectedSection}">
+    <TabControl.ItemTemplate>
+      <DataTemplate x:DataType="vm:PageViewModel">
+        <TextBlock Text="{Binding Title}" />
+      </DataTemplate>
+    </TabControl.ItemTemplate>
+  </TabControl>
+</UserControl>

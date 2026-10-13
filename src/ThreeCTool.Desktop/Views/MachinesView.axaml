@@ -1,0 +1,165 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:m="using:ThreeCTool.Core.Machines"
+             x:Class="ThreeCTool.Desktop.Views.MachinesView"
+             x:DataType="vm:MachinesViewModel">
+  <Grid ColumnDefinitions="250,*" Margin="0,8,0,0">
+    <DockPanel Margin="0,0,12,0">
+      <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <Button Name="NewMachine" Content="New" Command="{Binding NewCommand}" Margin="0,0,4,4" />
+        <Button Name="DuplicateMachine" Content="Duplicate" Command="{Binding DuplicateCommand}" Margin="0,0,4,4" />
+        <Button Name="DeleteMachine" Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,4,4" />
+      </WrapPanel>
+      <ListBox Name="MachineList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="m:MachineProfile">
+            <TextBlock Text="{Binding Name}" />
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+
+    <Grid Grid.Column="1" RowDefinitions="*,Auto" DataContext="{Binding Editor}" x:DataType="vm:MachineEditorViewModel"
+          IsVisible="{Binding $parent[UserControl].((vm:MachinesViewModel)DataContext).Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <ScrollViewer>
+        <StackPanel Margin="0,0,16,0" MaxWidth="900" HorizontalAlignment="Left">
+          <TextBlock Text="General" Classes="section" Margin="0,0,0,4" />
+          <Grid ColumnDefinitions="190,*" Margin="0,2">
+            <TextBlock Text="Name" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Name="MachineName" Text="{Binding Model.Name}" />
+          </Grid>
+          <ContentControl Content="{Binding SafeZ}" />
+          <CheckBox Content="Fit arcs (G2/G3) in the output" IsChecked="{Binding Model.ArcFitting}" />
+          <ContentControl Content="{Binding ArcTolerance}" />
+
+          <TextBlock Text="Controller (FluidNC config.yaml)" Classes="section" />
+          <TextBlock Text="{Binding ControllerSummary}" TextWrapping="Wrap" Classes="muted" />
+          <Border Classes="card" IsVisible="{Binding !HasNoAxes}">
+            <ItemsControl ItemsSource="{Binding Axes}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:AxisRow">
+                  <Grid ColumnDefinitions="30,120,130,120,200,*">
+                    <TextBlock Text="{Binding Axis}" FontWeight="SemiBold" />
+                    <TextBlock Grid.Column="1" Text="{Binding StepsPerUnit}" />
+                    <TextBlock Grid.Column="2" Text="{Binding MaxRate}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Acceleration}" />
+                    <TextBlock Grid.Column="4" Text="{Binding Travel}" />
+                    <TextBlock Grid.Column="5" Text="{Binding Homing}" Classes="muted" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </Border>
+          <ItemsControl Name="ImportChanges" ItemsSource="{Binding ImportChanges}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Foreground="#E0A000" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+
+          <TextBlock Text="Spindle" Classes="section" />
+          <ContentControl Content="{Binding MinRpm}" />
+          <ContentControl Content="{Binding MaxRpm}" />
+          <ContentControl Content="{Binding RatedPower}" />
+          <ContentControl Content="{Binding RatedRpm}" />
+          <ContentControl Content="{Binding PowerCurve}" />
+          <CheckBox Content="Speed is set by hand on the spindle (the operator is prompted)" IsChecked="{Binding Model.Spindle.ManualDial}" />
+
+          <TextBlock Text="Rotary axis (A, around X)" Classes="section" />
+          <ContentControl Content="{Binding MaxDiameter}" />
+          <ContentControl Content="{Binding MaxLength}" />
+          <ContentControl Content="{Binding MinCenterHeight}" />
+          <ContentControl Content="{Binding MaxCenterHeight}" />
+          <TextBlock Text="Calibrated axis positions" Margin="0,8,0,2" />
+          <ItemsControl ItemsSource="{Binding Centers}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:RotaryCenterRow">
+                <Border Classes="card">
+                  <StackPanel>
+                    <Grid ColumnDefinitions="190,*,Auto" Margin="0,2">
+                      <TextBlock Text="Name" VerticalAlignment="Center" />
+                      <TextBox Grid.Column="1" Text="{Binding Center.Name}" />
+                      <Button Grid.Column="2" Content="Remove" Margin="8,0,0,0"
+                              Command="{Binding $parent[ItemsControl].((vm:MachineEditorViewModel)DataContext).RemoveCenterCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                    <ContentControl Content="{Binding Height}" />
+                    <ContentControl Content="{Binding Y}" />
+                    <ContentControl Content="{Binding Z}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Content="Add axis position" Command="{Binding AddCenterCommand}" />
+
+          <TextBlock Text="Collets" Classes="section" />
+          <ItemsControl Name="Collets" ItemsSource="{Binding Collets}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:ColletRow">
+                <Border Classes="card">
+                  <StackPanel>
+                    <Grid ColumnDefinitions="190,*,Auto" Margin="0,2">
+                      <TextBlock Text="Name" VerticalAlignment="Center" />
+                      <TextBox Grid.Column="1" Text="{Binding Collet.Name}" />
+                      <Button Grid.Column="2" Content="Remove" Margin="8,0,0,0"
+                              Command="{Binding $parent[ItemsControl].((vm:MachineEditorViewModel)DataContext).RemoveColletCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                    <ContentControl Content="{Binding Shank}" />
+                    <ContentControl Content="{Binding Holder}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <Button Name="AddCollet" Content="Add collet" Command="{Binding AddColletCommand}" />
+
+          <TextBlock Text="Probing" Classes="section" />
+          <Grid ColumnDefinitions="190,*" Margin="0,2">
+            <TextBlock Text="Default method" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MachineEditorViewModel.ProbeMethods}" SelectedItem="{Binding Model.Probe.DefaultMethod, Mode=TwoWay}" />
+          </Grid>
+          <ContentControl Content="{Binding ToolSetterX}" />
+          <ContentControl Content="{Binding ToolSetterY}" />
+          <ContentControl Content="{Binding ToolSetterStartZ}" />
+          <ContentControl Content="{Binding TouchPlate}" />
+          <ContentControl Content="{Binding ProbeDistance}" />
+          <ContentControl Content="{Binding ProbeRetract}" />
+          <ContentControl Content="{Binding SeekFeed}" />
+          <ContentControl Content="{Binding LatchFeed}" />
+
+          <TextBlock Text="Coolant and dust extraction" Classes="section" />
+          <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto" Margin="0,2">
+            <TextBlock Text="Coolant" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MachineEditorViewModel.CoolantModes}" SelectedItem="{Binding Model.Coolant.Mode, Mode=TwoWay}" />
+            <TextBlock Grid.Row="1" Text="Dust extraction on" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Model.Coolant.DustExtractionOnCode}" PlaceholderText="e.g. M64 P1 (empty = none)" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="2" Text="Dust extraction off" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Model.Coolant.DustExtractionOffCode}" PlaceholderText="e.g. M65 P1" Margin="0,4,0,0" />
+          </Grid>
+
+          <TextBlock Text="Direct connection" Classes="section" />
+          <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto" Margin="0,2">
+            <TextBlock Text="Transport" VerticalAlignment="Center" />
+            <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MachineEditorViewModel.Transports}" SelectedItem="{Binding Model.Connection.Transport, Mode=TwoWay}" />
+            <TextBlock Grid.Row="1" Text="Serial port" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Model.Connection.SerialPort}" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="2" Text="Host" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Model.Connection.Host}" Margin="0,4,0,0" />
+          </Grid>
+          <ContentControl Content="{Binding BaudRate}" />
+          <ContentControl Content="{Binding TcpPort}" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button Name="SaveMachine" Content="Save" Classes="primary" Command="{Binding $parent[UserControl].((vm:MachinesViewModel)DataContext).SaveCommand}" />
+        <Button Content="Revert" Command="{Binding $parent[UserControl].((vm:MachinesViewModel)DataContext).RevertCommand}" />
+        <Button Name="ImportConfig" Content="Import FluidNC config…" Command="{Binding $parent[UserControl].((vm:MachinesViewModel)DataContext).ImportConfigCommand}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

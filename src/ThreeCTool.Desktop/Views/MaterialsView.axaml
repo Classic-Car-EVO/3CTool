@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:mat="using:ThreeCTool.Core.Materials"
+             xmlns:views="using:ThreeCTool.Desktop.Views"
+             x:Class="ThreeCTool.Desktop.Views.MaterialsView"
+             x:DataType="vm:MaterialsViewModel">
+  <Grid ColumnDefinitions="280,*" Margin="0,8,0,0">
+    <DockPanel Margin="0,0,12,0">
+      <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <Button Name="NewMaterial" Content="New" Command="{Binding NewCommand}" Margin="0,0,4,4" />
+        <Button Name="DuplicateMaterial" Content="Duplicate" Command="{Binding DuplicateCommand}" Margin="0,0,4,4" />
+        <Button Name="DeleteMaterial" Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,4,4" />
+      </WrapPanel>
+      <ListBox Name="MaterialList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="mat:Material">
+            <StackPanel>
+              <TextBlock Text="{Binding Name}" />
+              <TextBlock Classes="muted" FontSize="12">
+                <Run Text="{Binding Category}" /><Run Text="{Binding IsBuiltIn, Converter={x:Static views:Converters.BuiltInSuffix}}" />
+              </TextBlock>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+
+    <Grid Grid.Column="1" RowDefinitions="Auto,*,Auto" DataContext="{Binding Editor}" x:DataType="vm:MaterialEditorViewModel"
+          IsVisible="{Binding $parent[UserControl].((vm:MaterialsViewModel)DataContext).Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <Border Classes="card" IsVisible="{Binding IsReadOnly}" Margin="0,0,16,8">
+        <TextBlock Text="Built-in material: values are updated with 3C Tool. Duplicate it to make your own version." TextWrapping="Wrap" />
+      </Border>
+      <ScrollViewer Grid.Row="1">
+        <StackPanel Margin="0,0,16,0" MaxWidth="900" HorizontalAlignment="Left" IsEnabled="{Binding IsEditable}">
+          <TextBlock Text="Material" Classes="section" Margin="0,0,0,4" />
+          <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto" Margin="0,2">
+            <TextBlock Text="Name" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Name="MaterialName" Text="{Binding Model.Name}" />
+            <TextBlock Grid.Row="1" Text="Category" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="1" Grid.Column="1" ItemsSource="{x:Static vm:MaterialEditorViewModel.Categories}" SelectedItem="{Binding Model.Category, Mode=TwoWay}" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="2" Text="Hardness" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Model.Hardness}" Margin="0,4,0,0" />
+          </Grid>
+
+          <TextBlock Text="Cutting model" Classes="section" />
+          <ContentControl Content="{Binding CuttingForce}" />
+          <ContentControl Content="{Binding KienzleExponent}" />
+          <ContentControl Content="{Binding ToleranceScale}" />
+          <ContentControl Content="{Binding MaxDocFactor}" />
+          <ContentControl Content="{Binding MaxWocFactor}" />
+
+          <TextBlock Text="Cutting data" Classes="section" />
+          <ItemsControl ItemsSource="{Binding CuttingData}">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="vm:CuttingDataRow">
+                <Border Classes="card">
+                  <StackPanel>
+                    <Grid ColumnDefinitions="190,*,Auto" Margin="0,2">
+                      <TextBlock Text="Tool material" VerticalAlignment="Center" />
+                      <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MaterialEditorViewModel.ToolMaterials}" SelectedItem="{Binding Data.ToolMaterial, Mode=TwoWay}" />
+                      <Button Grid.Column="2" Content="Remove" Margin="8,0,0,0"
+                              Command="{Binding $parent[ItemsControl].((vm:MaterialEditorViewModel)DataContext).RemoveCuttingDataCommand}"
+                              CommandParameter="{Binding}" />
+                    </Grid>
+                    <ContentControl Content="{Binding SpeedMin}" />
+                    <ContentControl Content="{Binding SpeedMax}" />
+                    <ContentControl Content="{Binding ChipLoad}" />
+                  </StackPanel>
+                </Border>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Text="Surface speed in m/min; chip load in mm per tooth by tool diameter (mm)." Classes="muted" />
+          <Button Content="Add cutting data" Command="{Binding AddCuttingDataCommand}" Margin="0,6,0,0" />
+
+          <TextBlock Text="Notes" Classes="section" />
+          <TextBox Text="{Binding Model.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="2" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button Name="SaveMaterial" Content="Save" Classes="primary" Command="{Binding $parent[UserControl].((vm:MaterialsViewModel)DataContext).SaveCommand}" />
+        <Button Content="Revert" Command="{Binding $parent[UserControl].((vm:MaterialsViewModel)DataContext).RevertCommand}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

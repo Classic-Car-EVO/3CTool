@@ -1,0 +1,55 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             x:Class="ThreeCTool.Desktop.Views.SettingsView"
+             x:DataType="vm:SettingsViewModel">
+  <Grid RowDefinitions="*,Auto">
+    <ScrollViewer>
+      <StackPanel MaxWidth="900" HorizontalAlignment="Left" Margin="0,0,16,0">
+        <TextBlock Text="Settings" Classes="title" />
+
+        <TextBlock Text="Computation" Classes="section" />
+        <Grid ColumnDefinitions="190,*" Margin="0,2">
+          <TextBlock Text="Accelerator" VerticalAlignment="Center" />
+          <ComboBox Grid.Column="1" Name="Backend" ItemsSource="{x:Static vm:SettingsViewModel.Backends}" SelectedItem="{Binding Backend}" MinWidth="320" />
+        </Grid>
+        <TextBlock Text="{Binding ActiveDevice, StringFormat='In use: {0}'}" Margin="0,4" />
+        <TextBlock Text="{Binding ComputeError}" IsVisible="{Binding ComputeError, Converter={x:Static ObjectConverters.IsNotNull}}" Classes="error" />
+        <TextBlock Text="Available" Margin="0,6,0,2" Classes="muted" />
+        <ItemsControl Name="Devices" ItemsSource="{Binding Devices}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Text="{Binding}" Margin="8,1" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Name="TestAccelerator" Content="Start accelerator now" Command="{Binding TestAcceleratorCommand}" Margin="0,6,0,0" />
+
+        <TextBlock Text="Display" Classes="section" />
+        <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto" Margin="0,2">
+          <TextBlock Text="3D preview" VerticalAlignment="Center" />
+          <ComboBox Grid.Column="1" Name="Renderer" ItemsSource="{x:Static vm:SettingsViewModel.Renderers}" SelectedItem="{Binding Renderer}" MinWidth="320" />
+          <TextBlock Grid.Row="1" Text="Length unit" VerticalAlignment="Center" />
+          <ComboBox Grid.Row="1" Grid.Column="1" Name="DisplayUnit" ItemsSource="{x:Static vm:SettingsViewModel.DisplayUnits}" SelectedItem="{Binding DisplayUnit}" MinWidth="320" Margin="0,4,0,0" />
+        </Grid>
+        <TextBlock Text="Lengths can always be typed with a unit (6 mm, 1/4&quot;, 0.5 in)." Classes="muted" Margin="0,4" />
+        <CheckBox Content="Show rapid moves in tool path previews" IsChecked="{Binding ShowRapids}" />
+
+        <TextBlock Text="Projects" Classes="section" />
+        <Grid ColumnDefinitions="190,*,Auto" Margin="0,2">
+          <TextBlock Text="Projects folder" VerticalAlignment="Center" />
+          <TextBox Grid.Column="1" Name="ProjectsFolder" Text="{Binding ProjectsFolder}" />
+          <Button Grid.Column="2" Content="Browse…" Command="{Binding BrowseProjectsFolderCommand}" Margin="8,0,0,0" />
+        </Grid>
+
+        <TextBlock Text="Diagnostics" Classes="section" />
+        <SelectableTextBlock Text="{Binding Diagnostics}" FontFamily="monospace" TextWrapping="Wrap" />
+      </StackPanel>
+    </ScrollViewer>
+
+    <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+      <Button Name="SaveSettings" Content="Save" Classes="primary" Command="{Binding SaveCommand}" />
+      <Button Content="Revert" Command="{Binding RevertCommand}" />
+    </StackPanel>
+  </Grid>
+</UserControl>

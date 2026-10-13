@@ -12,6 +12,10 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Avalonia.Headless" />
+  </ItemGroup>
+
+  <ItemGroup>
     <ProjectReference Include="..\..\src\ThreeCTool.Desktop\ThreeCTool.Desktop.csproj" />
     <ProjectReference Include="..\ThreeCTool.FluidNcSimulator\ThreeCTool.FluidNcSimulator.csproj" />
   </ItemGroup>
