@@ -1,0 +1,33 @@
+[Unit]
+Description=3C Tool feeder daemon (FluidNC job streaming)
+Documentation=https://github.com/schilpr-TT/3CTool
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+Type=notify
+User=3ctool-feeder
+Group=3ctool-feeder
+# Serial (USB) connection to the controller.
+SupplementaryGroups=dialout
+ExecStart=/usr/bin/3ctool-feederd
+Environment=HOME=/var/lib/3ctool-feeder DOTNET_gcServer=0
+# /run/3ctool-feeder holds the local socket used by the touch UI (mode 0660).
+RuntimeDirectory=3ctool-feeder
+RuntimeDirectoryMode=0750
+StateDirectory=3ctool-feeder
+StateDirectoryMode=0750
+Restart=on-failure
+RestartSec=3
+# A clean stop holds, resets and retracts a running job; give it time.
+TimeoutStopSec=60
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ProtectKernelTunables=yes
+ProtectControlGroups=yes
+RestrictSUIDSGID=yes
+
+[Install]
+WantedBy=multi-user.target

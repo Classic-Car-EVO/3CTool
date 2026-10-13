@@ -580,6 +580,19 @@ Progress:
   - FluidNC reports `#5063` (last probe Z) in machine coordinates. To be confirmed in spike 2.
   - G59 is reserved as the setter reference and is shared by all setups. The first file of a new setup overwrites it, so files of an earlier setup must not be run after it without running that setup's first file again.
   - An expression `G43.1` leaves the tool length offset unknown in the host's modal state. Recovery re-probes instead of restoring a value.
+- Feeder Pi app + gRPC, milling (section 11.4-11.5; FDM/heater parts come with the FDM stages):
+  - `ThreeCTool.Feeder.Contracts`: gRPC API (jobs with chunked SHA-256-verified upload, preview, start/pause/resume/stop, overrides, spindle RPM changes, jog incl. press-and-hold with keep-alives, homing, work zero, touch-plate probe, status and run-event streams, operator prompts, recovery, feedback, controller config) plus `LocalAdmin` (settings, serial ports, pairing, revocation).
+  - Daemon `3ctool-feederd` (ASP.NET Core, systemd notify): TLS with a self-signed certificate pinned at pairing; desktops pair with a 6-digit code shown on the touch screen and then use a bearer token. The touch UI uses a Unix socket (`/run/3ctool-feeder/feeder.sock`, mode 0660) with local-admin rights. Jobs, runs, events, feedback and pairings live in SQLite under `/var/lib/3ctool-feeder`; the run journal drives recovery after stop, e-stop, disconnect and power loss.
+  - Desktop: `PairedFeeder` uploads posted files, watches runs and downloads feedback into `FeedLearning`.
+  - `ThreeCTool.Rendering`: toolpath preview shared by desktop and Pi (OpenGL ES via Silk.NET with a software canvas fallback; orbit, pan, pinch zoom, progress highlight, tool marker in the part frame).
+  - Touch UI `3ctool-feeder-ui` (Avalonia, DRM/KMS kiosk or desktop window, 800x480): jobs with 3D preview, run page (progress, ETA, feed override, spindle RPM, pause/resume/stop), jog pad (steps or press-and-hold), homing, unlock, work zero, touch-plate probe, settings with an on-screen keyboard, desktop pairing and revocation, operator prompts (M0, spindle RPM), recovery wizard and end-of-job feedback.
+  - Tests run the daemon on a temp directory against the FluidNC simulator; headless Avalonia tests drive the touch UI against the same service.
+  - Packaging: `packaging/feeder/build-deb.sh` builds `3ctool-feeder_<version>_arm64.deb` (self-contained linux-arm64 daemon and UI, `3ctool-feederd.service` and the kiosk `3ctool-feeder-ui.service` on tty1, config `/etc/3ctool-feeder/feeder.json`); CI uploads it as an artifact.
+
+  Assumptions and limits:
+  - The kiosk on real Pi hardware (DRM card, touch input, OpenGL ES) is spike 3; `--renderer software` and `--card` are available if needed.
+  - Desktop pairing tokens are stored in plain text in the desktop's library database.
+  - A package upgrade restarts the daemon; a running job is stopped and offered for recovery.
 8. Nozzle probing on the conductive tool setter (electrical ground path to the nozzle/heater block).
 
 ---

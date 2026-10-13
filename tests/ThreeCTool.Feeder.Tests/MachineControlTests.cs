@@ -95,7 +95,8 @@ public sealed class MachineControlTests
         Assert.Equal(-400, probe.WorkZMachine, 2);
         Assert.Equal(-410, feeder.Simulator.WorkOffset(0)[2], 2);
         Assert.Equal(1, feeder.Simulator.ProbeCount);
-        var status = await feeder.WaitStatusAsync(s => s.MachineState == "Idle");
+        // WCO is reported every few status reports, so the first Idle status may still carry the old offset.
+        var status = await feeder.WaitStatusAsync(s => s.MachineState == "Idle" && Math.Abs(s.WorkPosition.Z - 12) < 0.01);
         Assert.Equal(12, status.WorkPosition.Z, 2);
     }
 
