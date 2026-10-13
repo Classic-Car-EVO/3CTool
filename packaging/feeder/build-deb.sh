@@ -27,6 +27,8 @@ command -v dpkg-deb >/dev/null || { echo "dpkg-deb is required." >&2; exit 2; }
 
 stage=$(mktemp -d)
 trap 'rm -rf "$stage"' EXIT
+# mktemp makes the staging dir 0700, which would otherwise ship as the mode of "./" in the package.
+chmod 755 "$stage"
 app="$stage/opt/3ctool-feeder"
 
 # Invariant globalization: all formatting is culture-invariant, and it drops the libicu dependency
