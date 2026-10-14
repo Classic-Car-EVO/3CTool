@@ -91,8 +91,14 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
         tools = projectTools;
         tolerance = finishingTolerance;
         var report = simulation.Report;
+        // Summed like VerificationReport.Locate, so step starts match its boundaries exactly.
         var start = 0.0;
-        starts = [.. report.Steps.Select(s => (start += s.Duration) - s.Duration)];
+        starts = [.. report.Steps.Select(s =>
+        {
+            var begin = start;
+            start += s.Duration;
+            return begin;
+        })];
         Duration = report.CycleTime;
         IsAvailable = true;
         OnPropertyChanged(nameof(HasDeviation));
@@ -130,7 +136,16 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
 
         Pause();
         var times = r.Report.Steps[step].MoveEndTimes;
-        Time = starts[step] + (times.Length == 0 ? 0 : times[Math.Clamp(move, 0, times.Length - 1)]);
+        if (times.Length == 0)
+        {
+            Time = starts[step];
+            return;
+        }
+
+        // Inside the move, not on its end: the rounded sum of start and end time can land in the next move.
+        move = Math.Clamp(move, 0, times.Length - 1);
+        var begin = move == 0 ? 0 : times[move - 1];
+        Time = starts[step] + Math.Min(begin + StepNudge, (begin + times[move]) / 2);
     }
 
     /// <summary>Waits until the shown state matches <see cref="Time"/> (tests).</summary>

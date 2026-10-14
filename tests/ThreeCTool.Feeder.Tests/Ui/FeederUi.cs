@@ -12,7 +12,19 @@ using ThreeCTool.Feeder.ViewModels;
 using ThreeCTool.Feeder.Views;
 using ThreeCTool.Rendering;
 
+using Xunit.Abstractions;
+using Xunit.Sdk;
+
+[assembly: TestFramework("ThreeCTool.Feeder.Tests.Ui.UiTestFramework", "ThreeCTool.Feeder.Tests")]
+
 namespace ThreeCTool.Feeder.Tests.Ui;
+
+/// <summary>Avalonia's UI thread belongs to whichever thread touches it first, so the session must start before any test.</summary>
+public sealed class UiTestFramework : XunitTestFramework
+{
+    public UiTestFramework(IMessageSink messageSink)
+        : base(messageSink) => UiSession.Start();
+}
 
 /// <summary>Shared headless Avalonia session (Skia rendering, so frames can be captured).</summary>
 public static class UiSession
@@ -29,6 +41,8 @@ public static class UiSession
         await test();
         return true;
     }, CancellationToken.None);
+
+    public static void Start() => RunAsync(() => Task.CompletedTask).GetAwaiter().GetResult();
 }
 
 /// <summary>The touch UI in an 800x480 headless window, connected to a feeder harness over its Unix socket.</summary>

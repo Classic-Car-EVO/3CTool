@@ -23,7 +23,9 @@ jobs:
       - run: dotnet restore ThreeCTool.slnx
       - run: dotnet build ThreeCTool.slnx --no-restore -c Release
       # Hosted runners have no usable GPU; GPU tests run in gpu.yml on the self-hosted runner.
-      - run: dotnet test ThreeCTool.slnx --no-build -c Release --filter "Category!=Gpu"
+      # The CPU-heavy desktop tests run on their own so they don't starve the timing-sensitive feeder tests.
+      - run: dotnet test ThreeCTool.slnx --no-build -c Release --filter "Category!=Gpu&FullyQualifiedName!~ThreeCTool.Desktop.Tests"
+      - run: dotnet test tests/ThreeCTool.Desktop.Tests --no-build -c Release --filter "Category!=Gpu"
 
   feeder-linux-arm64:
     runs-on: ubuntu-latest

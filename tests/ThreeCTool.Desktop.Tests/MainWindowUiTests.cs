@@ -7,7 +7,19 @@ using ThreeCTool.Desktop.Services;
 using ThreeCTool.Desktop.ViewModels;
 using ThreeCTool.Desktop.Views;
 
+using Xunit.Abstractions;
+using Xunit.Sdk;
+
+[assembly: TestFramework("ThreeCTool.Desktop.Tests.UiTestFramework", "ThreeCTool.Desktop.Tests")]
+
 namespace ThreeCTool.Desktop.Tests;
+
+/// <summary>Avalonia's UI thread belongs to whichever thread touches it first, so the session must start before any test.</summary>
+public sealed class UiTestFramework : XunitTestFramework
+{
+    public UiTestFramework(IMessageSink messageSink)
+        : base(messageSink) => UiSession.Start();
+}
 
 /// <summary>Shared headless Avalonia session (Skia rendering, so frames are really drawn).</summary>
 public static class UiSession
@@ -23,6 +35,8 @@ public static class UiSession
         await test();
         return true;
     }, CancellationToken.None);
+
+    public static void Start() => RunAsync(() => Task.CompletedTask).GetAwaiter().GetResult();
 }
 
 public sealed class MainWindowUiTests : IAsyncDisposable
