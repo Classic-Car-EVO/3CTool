@@ -275,6 +275,31 @@ public sealed class FluidNcMillingPostTests
     }
 
     [Fact]
+    public void Post_StockPiece_NamesThePieceAndStopsToMountItBeforeTheFirstTool()
+    {
+        var piece = new StockPiece(3, 1, 2, 1, -100, 50, 0, 600, 300, 18);
+        var first = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), piece: piece, pieceCount: 4));
+        var later = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), first: false, piece: piece, pieceCount: 4));
+
+        const string Header = "(Piece 3 of 4: column 1, row 2, layer 1, 600 x 300 x 18 mm at X-100 Y50 Z0)";
+        const string Mount = "(Mount piece 3 of 4 for setup 1: column 1, row 2, layer 1, 600 x 300 x 18 mm at X-100 Y50 Z0)";
+        Assert.Equal(Header, first.Lines[3]);
+        var mount = first.Lines.ToList().IndexOf(Mount);
+        Assert.True(mount > 0);
+        Assert.Equal("M0", first.Lines[mount + 1]);
+        Assert.StartsWith("(Insert tool", first.Lines[mount + 2], StringComparison.Ordinal);
+        Assert.Equal("gcode/P03_01_Top_T01_Flat_6.nc", first.FileName);
+        Assert.Equal(3, first.Piece);
+
+        Assert.Contains(Header, later.Lines);
+        Assert.DoesNotContain(Mount, later.Lines);
+
+        var whole = post.Post(PostFixture.Request(PostFixture.SimpleMoves()));
+        Assert.Equal(0, whole.Piece);
+        Assert.DoesNotContain(whole.Lines, l => l.Contains("iece", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public void Post_ToolpathWarnings_AreReportedAndWrittenToTheHeader()
     {
         var request = PostFixture.Request(PostFixture.SimpleMoves());
@@ -411,6 +436,40 @@ public sealed class FluidNcMillingPostTests
         var machine = PostFixture.Machine();
         machine.Coolant.DustExtractionOnCode = "M62 P1 " + new string('X', 200);
         Assert.Throws<PostException>(() => post.Post(PostFixture.Request(PostFixture.SimpleMoves(), machine: machine)));
+    }
+
+    [Fact]
+    public void Post_TurnedStock_StopsToTurnItBeforeTheFirstTool()
+    {
+        var setup = PostFixture.Setup();
+        setup.Face = StockFace.Bottom;
+        setup.Spin = 0;
+        var first = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup)).Lines.ToList();
+        var later = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup, first: false)).Lines;
+
+        Assert.Contains("(Setup 1: Top, G54, 3-axis, bottom face up, spin 0 deg)", first);
+        var turn = first.FindIndex(l => l.StartsWith("(Turn the stock", StringComparison.Ordinal));
+        Assert.Equal(
+            "(Turn the stock for setup 1: bottom face up, original front face towards +Y back, original right face towards +X right; locate it in the jig centred on the dowel pins, the work offset stays)",
+            first[turn]);
+        Assert.Equal("M0", first[turn + 1]);
+        Assert.StartsWith("(Insert tool", first[turn + 2], StringComparison.Ordinal);
+        Assert.DoesNotContain(later, l => l.StartsWith("(Turn the stock", StringComparison.Ordinal));
+
+        var top = post.Post(PostFixture.Request(PostFixture.SimpleMoves())).Lines;
+        Assert.DoesNotContain(top, l => l.StartsWith("(Turn the stock", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FromStockBounds_TurnedStock_IsTheTopCentreOfTheTurnedStock()
+    {
+        // 100 x 60 x 20 stock on its front face (60 tall), zero kept at the original top centre.
+        var frame = new SetupFrame(SetupOrientation.ThreeAxis, 50, 10, -40, 0, StockFace.Front);
+        var spot = TouchPlateSpot.FromStockBounds(frame, new Geometry.BoundingBox(new Vector3(0, 0, 0), new Vector3(100, 60, 20)));
+
+        Assert.Equal(0, spot.X, 9);
+        Assert.Equal(0, spot.Y, 9);
+        Assert.Equal(40, spot.SurfaceZ, 9);
     }
 
     [Fact]

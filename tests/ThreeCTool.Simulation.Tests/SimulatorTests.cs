@@ -220,6 +220,20 @@ public sealed class SimulatorTests(ComputeFixture fixture, ITestOutputHelper out
     }
 
     [Fact]
+    public void RotaryCut_LeavesNoSliverAtItsEndPose()
+    {
+        // Coarse angle steps: each piece sweeps with its middle axis, so the last one lags the final pose by
+        // 2.5° · 8 mm ≈ 0.35 mm at the stock surface. The retract along the final axis must still find the cut clear.
+        var frame = new SetupFrame(SetupOrientation.SimultaneousRotary, 0, 0, 0, 0);
+        var step = Milling("turn", Flat(), [Rapid(20, 0, 30), Plunge(20, 0, 12), Cut(20, 0, 12, 90), Rapid(20, 0, 30, 90), Rapid(20, 0, 30, 0)], frame, Collet());
+        var stock = new Stock { Type = StockType.Cylinder, Length = 40, Diameter = 40 };
+        var job = Job(fixture.Compute, SolidMeshes.XCylinder(0, 40, 0, 0, 5, 0.01), stock, [step], o => o.MaxAngleStep = 5);
+        using var result = Run(job);
+
+        Assert.Empty(result.Report.Errors());
+    }
+
+    [Fact]
     public void Deposition_AddsBeads_CountsFilament_AndDetectsHeadOnPrintedMaterial()
     {
         var head = new Toolhead

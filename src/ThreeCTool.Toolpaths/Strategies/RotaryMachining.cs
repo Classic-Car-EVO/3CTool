@@ -1,5 +1,6 @@
 using System.Numerics;
 
+using ThreeCTool.Compute;
 using ThreeCTool.Core.Projects;
 
 namespace ThreeCTool.Toolpaths.Strategies;
@@ -26,15 +27,21 @@ internal static class RotaryMachining
         var (x0, x1) = XRange(context);
         var sample = ParallelFinishing.SampleStep(context);
         var polylines = Pattern(settings.RotaryPattern, x0, x1, settings.Stepover, sample, reference);
+
+        // Refinement and simplification share the error budget, which stays within the gouge threshold.
+        var gouge = context.Request.Tolerances.GougeThreshold;
+        var budget = gouge > 0 ? Math.Min(context.Tolerance, gouge) : context.Tolerance;
         context.Report(0.2);
         var runs = new List<List<P3>>();
         foreach (var polyline in polylines)
         {
             var dropped = Drop(context, polyline);
-            Refine(context, polyline, dropped);
-            runs.AddRange(Split(polyline, dropped, reference).Select(r => PassTools.Simplify(r, 0.5 * context.Tolerance)));
+            Refine(context, polyline, dropped, 0.5 * budget);
+            runs.AddRange(Split(polyline, dropped, reference).Select(r => PassTools.Simplify(r, 0.4 * budget)));
         }
 
+        context.Report(0.7);
+        CheckReach(context, runs, reference);
         context.Report(0.8);
         builder.StayDownLink = (a, b) => SurfaceLink(context, a, b, reference, Math.Max(2 * settings.Stepover, context.Radius));
         Emit(builder, runs, settings.Direction, inMaterial: false, double.NaN);
@@ -52,7 +59,7 @@ internal static class RotaryMachining
         {
             // Refined once: the linear interpolation of max(layer, drop) then stays within tolerance on every layer.
             var dropped = Drop(context, polyline);
-            Refine(context, polyline, dropped);
+            Refine(context, polyline, dropped, context.Tolerance);
             drops.Add(dropped);
         }
         var contact = drops.SelectMany(d => d).Where(z => !double.IsNegativeInfinity(z)).DefaultIfEmpty(0).Min();
@@ -207,6 +214,7 @@ internal static class RotaryMachining
         return ring;
     }
 
+    /// <summary>Safe tip radius per (X, A°); −∞ where nothing is on the tool's side of the axis (it would have to pass the axis).</summary>
     private static List<double> Drop(StrategyContext context, List<(double X, double A)> points)
     {
         context.Token.ThrowIfCancellationRequested();
@@ -216,11 +224,11 @@ internal static class RotaryMachining
             xa[i] = new Vector2((float)points[i].X, (float)Math.IEEERemainder(points[i].A, 360));
         }
 
-        return [.. context.Stocked.DropRotary(context.Setup, xa).Select(z => (double)z)];
+        return [.. context.Stocked.DropRotary(context.Setup, xa).Select(z => z < 0 ? double.NegativeInfinity : z)];
     }
 
-    /// <summary>Inserts midpoints where the tip radius deviates from the chord by more than the tolerance.</summary>
-    private static void Refine(StrategyContext context, List<(double X, double A)> points, List<double> radius)
+    /// <summary>Inserts midpoints where the tip radius deviates from the chord by more than <paramref name="tolerance"/>.</summary>
+    private static void Refine(StrategyContext context, List<(double X, double A)> points, List<double> radius, double tolerance)
     {
         for (var round = 0; round < RefineRounds; round++)
         {
@@ -245,7 +253,7 @@ internal static class RotaryMachining
             var inserted = false;
             for (var k = mids.Count - 1; k >= 0; k--)
             {
-                if (!double.IsNegativeInfinity(dropped[k]) && Math.Abs(dropped[k] - mids[k].Linear) > context.Tolerance)
+                if (!double.IsNegativeInfinity(dropped[k]) && Math.Abs(dropped[k] - mids[k].Linear) > tolerance)
                 {
                     points.Insert(mids[k].Index, mids[k].Point);
                     radius.Insert(mids[k].Index, dropped[k]);
@@ -257,6 +265,69 @@ internal static class RotaryMachining
             {
                 return;
             }
+        }
+    }
+
+    /// <summary>
+    /// Warns where the tip goes more than the flute length below the material the earlier operations leave (simulated
+    /// on a coarse dexel stock): there the shank or holder would have to cut.
+    /// </summary>
+    private static void CheckReach(StrategyContext context, List<List<P3>> runs, double reference)
+    {
+        var tool = context.Tool;
+        var flute = tool.Tool.FluteLength > 0 ? tool.Tool.FluteLength : tool.Cutter.Height;
+        var deep = runs.SelectMany(r => r).Where(p => p.Z + flute < context.Setup.StockRadius).ToList();
+        if (deep.Count == 0)
+        {
+            return;
+        }
+
+        var resolution = (float)Math.Clamp(context.Radius, 0.5, 2);
+        DexelGrid grid;
+        using (var stock = RestMachining.SimulatedStock(context, resolution))
+        {
+            grid = stock.Read(DexelAxis.Z);
+        }
+
+        // Clear of the dexel discretisation (lateral and the slivers of the simulated rotary moves).
+        var margin = 2 * resolution;
+        var (count, x0, x1) = (0, double.MaxValue, double.MinValue);
+        foreach (var p in deep)
+        {
+            var (sin, cos) = Math.SinCos(p.Y / reference);
+            var h = p.Z + flute + margin;
+            if (Inside(grid, p.X, h * sin, h * cos))
+            {
+                count++;
+                (x0, x1) = (Math.Min(x0, p.X), Math.Max(x1, p.X));
+            }
+        }
+
+        if (count > 0)
+        {
+            context.Warnings.Add(FormattableString.Invariant(
+                $"Rotary finishing: at {count} points (X {x0:0.#} to {x1:0.#}) the tip is more than the flute length ({flute:0.##} mm) below the material the earlier operations leave, so the shank or holder would cut. Rough deeper there first or use a tool with longer flutes."));
+        }
+
+        static bool Inside(DexelGrid grid, double x, double y, double z)
+        {
+            var iu = (int)Math.Floor((x - grid.OriginU) / grid.Resolution);
+            var iv = (int)Math.Floor((y - grid.OriginV) / grid.Resolution);
+            if (iu < 0 || iv < 0 || iu >= grid.CountU || iv >= grid.CountV)
+            {
+                return false;
+            }
+
+            var ray = grid.Ray(iu, iv);
+            for (var k = 0; k + 1 < ray.Length; k += 2)
+            {
+                if (ray[k] <= z && z <= ray[k + 1])
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 

@@ -1,15 +1,103 @@
 <Application xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:views="using:ThreeCTool.Desktop.Views"
              x:Class="ThreeCTool.Desktop.App"
-             xmlns:local="using:ThreeCTool.Desktop"
              RequestedThemeVariant="Default">
-             <!-- "Default" ThemeVariant follows system theme variant. "Dark" or "Light" are other available options. -->
 
-    <Application.DataTemplates>
-        <local:ViewLocator />
-    </Application.DataTemplates>
+  <Application.DataTemplates>
+    <DataTemplate DataType="vm:ProjectViewModel"><views:ProjectView /></DataTemplate>
+    <DataTemplate DataType="vm:ProjectDetailsViewModel"><views:ProjectDetailsView /></DataTemplate>
+    <DataTemplate DataType="vm:PartsViewModel"><views:PartsView /></DataTemplate>
+    <DataTemplate DataType="vm:StockViewModel"><views:StockView /></DataTemplate>
+    <DataTemplate DataType="vm:KeepOutsViewModel"><views:KeepOutsView /></DataTemplate>
+    <DataTemplate DataType="vm:MachiningViewModel"><views:MachiningView /></DataTemplate>
+    <DataTemplate DataType="vm:SetupEditor"><views:SetupEditorView /></DataTemplate>
+    <DataTemplate DataType="vm:OperationEditor"><views:OperationEditorView /></DataTemplate>
+    <DataTemplate DataType="vm:MachineViewModel"><views:MachineView /></DataTemplate>
+    <DataTemplate DataType="vm:LibraryViewModel"><views:LibraryView /></DataTemplate>
+    <DataTemplate DataType="vm:MachinesViewModel"><views:MachinesView /></DataTemplate>
+    <DataTemplate DataType="vm:ToolsViewModel"><views:ToolsView /></DataTemplate>
+    <DataTemplate DataType="vm:MaterialsViewModel"><views:MaterialsView /></DataTemplate>
+    <DataTemplate DataType="vm:StockSizesViewModel"><views:StockSizesView /></DataTemplate>
+    <DataTemplate DataType="vm:LearningViewModel"><views:LearningView /></DataTemplate>
+    <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
+    <DataTemplate DataType="vm:ConfirmViewModel"><views:ConfirmView /></DataTemplate>
 
-    <Application.Styles>
-        <FluentTheme />
-    </Application.Styles>
+    <!-- Number entry: label, text box, unit and the parse error. -->
+    <DataTemplate DataType="vm:NumberField">
+      <Grid ColumnDefinitions="190,140,40" RowDefinitions="Auto,Auto" Margin="0,2">
+        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Text="{Binding Text}" PlaceholderText="{Binding Hint}" Classes.invalid="{Binding HasError}" />
+        <TextBlock Grid.Column="2" Text="{Binding UnitText}" Margin="6,0,0,0" VerticalAlignment="Center" Classes="muted" />
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:SeamField">
+      <Grid ColumnDefinitions="190,*,40" RowDefinitions="Auto,Auto" Margin="0,2">
+        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Text="{Binding Text}" PlaceholderText="none" Classes.invalid="{Binding HasError}" />
+        <TextBlock Grid.Column="2" Text="{Binding UnitText}" Margin="6,0,0,0" VerticalAlignment="Center" Classes="muted" />
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" TextWrapping="Wrap" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:TableField">
+      <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto" Margin="0,2">
+        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Text="{Binding Text}" PlaceholderText="{Binding Hint}" Classes.invalid="{Binding HasError}" />
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" />
+      </Grid>
+    </DataTemplate>
+  </Application.DataTemplates>
+
+  <Application.Resources>
+    <SolidColorBrush x:Key="DangerBrush" Color="#C62828" />
+    <SolidColorBrush x:Key="AccentBrush" Color="#2E7DD7" />
+    <SolidColorBrush x:Key="MutedBrush" Color="#8A939C" />
+  </Application.Resources>
+
+  <Application.Styles>
+    <FluentTheme />
+
+    <Style Selector="TextBlock.muted">
+      <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+    </Style>
+    <Style Selector="TextBlock.error">
+      <Setter Property="Foreground" Value="{StaticResource DangerBrush}" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.warning">
+      <Setter Property="Foreground" Value="#D97706" />
+      <Setter Property="TextWrapping" Value="Wrap" />
+    </Style>
+    <Style Selector="TextBlock.title">
+      <Setter Property="FontSize" Value="20" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+    </Style>
+    <Style Selector="TextBlock.section">
+      <Setter Property="FontSize" Value="15" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Margin" Value="0,14,0,4" />
+    </Style>
+    <Style Selector="TextBox.invalid">
+      <Setter Property="BorderBrush" Value="{StaticResource DangerBrush}" />
+    </Style>
+    <Style Selector="Button.primary">
+      <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Button.danger">
+      <Setter Property="Background" Value="{StaticResource DangerBrush}" />
+      <Setter Property="Foreground" Value="White" />
+    </Style>
+    <Style Selector="Border.card">
+      <Setter Property="BorderBrush" Value="#40808080" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="6" />
+      <Setter Property="Padding" Value="10" />
+      <Setter Property="Margin" Value="0,4" />
+    </Style>
+  </Application.Styles>
 </Application>

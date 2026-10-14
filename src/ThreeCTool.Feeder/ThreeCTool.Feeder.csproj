@@ -28,7 +28,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ThreeCTool.Rendering\ThreeCTool.Rendering.csproj" />
-    <ProjectReference Include="..\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeder.Client\ThreeCTool.Feeder.Client.csproj" />
   </ItemGroup>
 </Project>

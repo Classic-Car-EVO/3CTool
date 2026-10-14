@@ -12,7 +12,7 @@ namespace ThreeCTool.Rendering;
 /// <remarks>OpenGL ES 3.0 feature set only, so the same code runs on the Pi.</remarks>
 public sealed class LineRenderer : IDisposable
 {
-    private const string VertexBody = """
+    internal const string VertexBody = """
         layout(location = 0) in vec3 a_position;
         layout(location = 1) in float a_line;
         uniform mat4 u_viewProjection;
@@ -25,7 +25,7 @@ public sealed class LineRenderer : IDisposable
         """;
 
     // A segment ending at line L interpolates (L-1, L]: it turns "done" once line L has executed.
-    private const string FragmentBody = """
+    internal const string FragmentBody = """
         in float v_line;
         uniform float u_progress;
         uniform vec4 u_color;

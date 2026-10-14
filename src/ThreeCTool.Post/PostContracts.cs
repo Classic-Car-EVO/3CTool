@@ -51,7 +51,14 @@ public readonly record struct TouchPlateSpot(double X, double Y, double SurfaceZ
         var x = (0.5 * (min.X + max.X)) - frame.OriginX;
         if (!frame.IsRotary)
         {
-            return new(x, (0.5 * (min.Y + max.Y)) - frame.OriginY, max.Z - frame.OriginZ);
+            // A turned stock shows another face on top: take the WCS box of the turned stock.
+            var corners = Enumerable.Range(0, 8)
+                .Select(i => frame.PartToWcs(new P3((i & 1) == 0 ? min.X : max.X, (i & 2) == 0 ? min.Y : max.Y, (i & 4) == 0 ? min.Z : max.Z), 0))
+                .ToList();
+            return new(
+                0.5 * (corners.Min(c => c.X) + corners.Max(c => c.X)),
+                0.5 * (corners.Min(c => c.Y) + corners.Max(c => c.Y)),
+                corners.Max(c => c.Z));
         }
 
         if (stockRadius is { } radius)
@@ -97,6 +104,12 @@ public sealed class MillingPostRequest
     /// <summary>Position of the file within the setup (1-based), used in the file name.</summary>
     public int FileIndex { get; init; } = 1;
 
+    /// <summary>Stock piece this file machines when the stock is split into standard pieces; null otherwise.</summary>
+    public StockPiece? Piece { get; init; }
+
+    /// <summary>Number of stock pieces (with <see cref="Piece"/>).</summary>
+    public int PieceCount { get; init; }
+
     /// <summary>Machine position of the WCS origin at A = 0, when known; enables absolute travel checks.</summary>
     public System.Numerics.Vector3? WorkOffset { get; init; }
 
@@ -136,6 +149,9 @@ public sealed class PostOutput
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     public Guid SetupId { get; init; }
+
+    /// <summary>Stock piece number, 0 when the stock is not split.</summary>
+    public int Piece { get; init; }
 
     public Guid ToolId { get; init; }
 

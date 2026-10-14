@@ -1,0 +1,82 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:m="using:ThreeCTool.Core.Machines"
+             xmlns:mat="using:ThreeCTool.Core.Materials"
+             xmlns:t="using:ThreeCTool.Core.Tooling"
+             x:Class="ThreeCTool.Desktop.Views.ProjectDetailsView"
+             x:DataType="vm:ProjectDetailsViewModel">
+  <ScrollViewer>
+    <StackPanel Margin="0,4,14,8">
+      <Grid ColumnDefinitions="130,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto">
+        <TextBlock Text="Name" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Name="ProjectName" Text="{Binding Name}" />
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding NameError}" Classes="error"
+                   IsVisible="{Binding NameError, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <TextBlock Grid.Row="2" Text="Optimise for" VerticalAlignment="Center" />
+        <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{x:Static vm:ProjectDetailsViewModel.Goals}" SelectedItem="{Binding Goal}"
+                  HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+        <TextBlock Grid.Row="3" Text="Machine" VerticalAlignment="Center" />
+        <ComboBox Grid.Row="3" Grid.Column="1" Name="ProjectMachine" ItemsSource="{Binding Machines}" SelectedItem="{Binding Machine}"
+                  HorizontalAlignment="Stretch" Margin="0,4,0,0">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="m:MachineProfile"><TextBlock Text="{Binding Name}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <TextBlock Grid.Row="4" Text="Material" VerticalAlignment="Center" />
+        <ComboBox Grid.Row="4" Grid.Column="1" Name="ProjectMaterial" ItemsSource="{Binding Materials}" SelectedItem="{Binding Material}"
+                  PlaceholderText="Not chosen" HorizontalAlignment="Stretch" Margin="0,4,0,0">
+          <ComboBox.ItemTemplate>
+            <DataTemplate x:DataType="mat:Material"><TextBlock Text="{Binding Name}" /></DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
+        <CheckBox Grid.Row="5" Grid.Column="1" Content="Reset tolerances when the material changes" IsChecked="{Binding RescaleTolerances}" />
+      </Grid>
+      <TextBlock Text="{Binding SnapshotSummary}" Classes="muted" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+      <StackPanel IsVisible="{Binding HasLibraryChanges}">
+        <TextBlock Text="Library changes" Classes="section" />
+        <ItemsControl Name="LibraryChanges" ItemsSource="{Binding LibraryChanges}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="vm:SnapshotRow">
+              <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+                <TextBlock Text="{Binding Text}" TextWrapping="Wrap" VerticalAlignment="Center" />
+                <Button Grid.Column="1" Content="Use library version" Margin="6,0,0,0" IsVisible="{Binding CanRefresh}"
+                        Command="{Binding $parent[UserControl].((vm:ProjectDetailsViewModel)DataContext).RefreshSnapshotCommand}" CommandParameter="{Binding}" />
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+        <Button Name="RefreshAllSnapshots" Content="Use all library versions" Command="{Binding RefreshAllSnapshotsCommand}" Margin="0,4,0,0" />
+      </StackPanel>
+
+      <TextBlock Text="Tolerances" Classes="section" />
+      <ItemsControl ItemsSource="{Binding Tolerances}" />
+
+      <TextBlock Text="Tools in the project" Classes="section" />
+      <TextBlock Text="No tools yet: add them from the library below." Classes="muted" IsVisible="{Binding !ProjectTools.Count}" />
+      <ItemsControl Name="ProjectTools" ItemsSource="{Binding ProjectTools}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="t:Tool">
+            <Grid ColumnDefinitions="*,Auto" Margin="0,2">
+              <TextBlock Text="{Binding Name}" VerticalAlignment="Center" />
+              <Button Grid.Column="1" Content="Remove"
+                      Command="{Binding $parent[UserControl].((vm:ProjectDetailsViewModel)DataContext).RemoveToolCommand}" CommandParameter="{Binding}" />
+            </Grid>
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+
+      <TextBlock Text="Add from the library" Classes="section" />
+      <TextBlock Text="Every library tool is already in the project." Classes="muted" IsVisible="{Binding !AvailableTools.Count}" />
+      <ItemsControl Name="AvailableTools" ItemsSource="{Binding AvailableTools}">
+        <ItemsControl.ItemTemplate>
+          <DataTemplate x:DataType="vm:ToolPick">
+            <CheckBox IsChecked="{Binding IsSelected}" Content="{Binding Tool.Name}" />
+          </DataTemplate>
+        </ItemsControl.ItemTemplate>
+      </ItemsControl>
+      <Button Name="AddTools" Content="Add ticked tools" Command="{Binding AddToolsCommand}" Margin="0,4,0,0" IsVisible="{Binding !!AvailableTools.Count}" />
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

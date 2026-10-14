@@ -1,0 +1,60 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:views="using:ThreeCTool.Desktop.Views"
+             x:Class="ThreeCTool.Desktop.Views.StockView"
+             x:DataType="vm:StockViewModel">
+  <ScrollViewer>
+    <StackPanel Margin="0,4,14,8">
+      <Grid ColumnDefinitions="130,*">
+        <TextBlock Text="Stock" VerticalAlignment="Center" />
+        <ComboBox Grid.Column="1" Name="StockShape" ItemsSource="{x:Static vm:StockViewModel.Types}" SelectedItem="{Binding Type}" HorizontalAlignment="Stretch" />
+      </Grid>
+
+      <StackPanel IsVisible="{Binding IsBox}" Margin="0,8,0,0">
+        <ItemsControl Name="BoxStockFields" ItemsSource="{Binding BoxFields}" />
+
+        <TextBlock Text="Standard material size" Classes="section" />
+        <ComboBox Name="StockSizeChoice" ItemsSource="{Binding Sizes}" SelectedItem="{Binding Size}" HorizontalAlignment="Stretch" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0"
+                   Text="Sizes come from Library > Stock sizes. Choosing one makes the stock whole pieces of it around the models; a stock larger than one piece is split at seams into several pieces." />
+
+        <StackPanel IsVisible="{Binding HasPieceSize}" Margin="0,8,0,0" Spacing="4">
+          <TextBlock Name="PiecesSummary" Text="{Binding PiecesText}" TextWrapping="Wrap" />
+          <TextBlock Name="TilingProblem" Text="{Binding TilingProblem}" IsVisible="{Binding HasTilingProblem}" Classes="error" TextWrapping="Wrap" />
+          <TextBlock Text="Top view (drag a seam to move it)" Classes="muted" FontSize="12" Margin="0,4,0,0" />
+          <views:StockLayoutControl Name="TopLayout" Height="180" View="Top" LayoutData="{Binding Layout}" MoveSeamCommand="{Binding MoveSeamCommand}" />
+          <TextBlock Text="Front view (layers)" Classes="muted" FontSize="12" />
+          <views:StockLayoutControl Name="FrontLayout" Height="120" View="Front" LayoutData="{Binding Layout}" MoveSeamCommand="{Binding MoveSeamCommand}" />
+          <ItemsControl Name="SeamFields" ItemsSource="{Binding SeamFields}" />
+          <Button Name="EvenSeams" Content="Space seams evenly" Command="{Binding EvenSeamsCommand}" />
+          <ItemsControl ItemsSource="{Binding PieceList}" Margin="0,4,0,0">
+            <ItemsControl.ItemTemplate>
+              <DataTemplate x:DataType="x:String">
+                <TextBlock Text="{Binding}" Classes="muted" FontSize="12" />
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+          <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12"
+                     Text="Upper layers are cut through to their bottom face, so loose islands are not held; machine them as separate pieces and glue the layers and pieces together afterwards." />
+        </StackPanel>
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsCylinder}" Margin="0,8,0,0">
+        <ItemsControl Name="CylinderStockFields" ItemsSource="{Binding CylinderFields}" />
+        <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12"
+                   Text="The cylinder lies along X; its axis should be on the rotary axis of the machine." />
+      </StackPanel>
+      <StackPanel IsVisible="{Binding IsMesh}" Margin="0,8,0,0" Spacing="4">
+        <TextBlock Text="{Binding MeshPath}" />
+        <Button Content="Choose another mesh..." Command="{Binding LoadMeshCommand}" />
+      </StackPanel>
+
+      <StackPanel IsVisible="{Binding !IsMesh}">
+        <TextBlock Text="Fit to the models" Classes="section" />
+        <ContentControl Content="{Binding Margin}" />
+        <Button Name="FitStock" Content="Fit stock" Command="{Binding FitToPartCommand}" Margin="0,4,0,0" />
+        <Button Content="Use a mesh file..." Command="{Binding LoadMeshCommand}" Margin="0,12,0,0" />
+      </StackPanel>
+    </StackPanel>
+  </ScrollViewer>
+</UserControl>

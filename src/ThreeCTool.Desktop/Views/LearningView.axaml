@@ -1,0 +1,47 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             x:Class="ThreeCTool.Desktop.Views.LearningView"
+             x:DataType="vm:LearningViewModel">
+  <Grid RowDefinitions="Auto,Auto,*,Auto,*" Margin="0,8,0,0">
+    <TextBlock Text="Learned feed corrections" Classes="section" Margin="0,0,0,4" />
+    <WrapPanel Grid.Row="1" Margin="0,0,0,6">
+      <Button Name="ResetSelected" Content="Reset selected" Command="{Binding ResetSelectedCommand}" Margin="0,0,4,4" />
+      <Button Content="Reset for this material" Command="{Binding ResetMaterialCommand}" Margin="0,0,4,4" />
+      <Button Content="Reset for this tool" Command="{Binding ResetToolCommand}" Margin="0,0,4,4" />
+      <Button Name="ResetAll" Content="Reset all" Classes="danger" Command="{Binding ResetAllCommand}" Margin="0,0,4,4" />
+    </WrapPanel>
+    <ListBox Grid.Row="2" Name="Corrections" ItemsSource="{Binding Corrections}" SelectedItem="{Binding SelectedCorrection}">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:CorrectionRow">
+          <Grid ColumnDefinitions="200,200,170,110,110,90,*">
+            <TextBlock Text="{Binding Material}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="1" Text="{Binding Tool}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="2" Text="{Binding Strategy}" />
+            <TextBlock Grid.Column="3" Text="{Binding ChipLoad, StringFormat='chip {0}'}" />
+            <TextBlock Grid.Column="4" Text="{Binding SurfaceSpeed, StringFormat='speed {0}'}" />
+            <TextBlock Grid.Column="5" Text="{Binding Samples, StringFormat='{}{0} jobs'}" />
+            <TextBlock Grid.Column="6" Text="{Binding Updated}" Classes="muted" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+
+    <TextBlock Grid.Row="3" Text="Job feedback" Classes="section" />
+    <ListBox Grid.Row="4" Name="Feedback" ItemsSource="{Binding Feedback}">
+      <ListBox.ItemTemplate>
+        <DataTemplate x:DataType="vm:FeedbackRow">
+          <Grid ColumnDefinitions="140,180,160,160,230,130,*">
+            <TextBlock Text="{Binding When}" />
+            <TextBlock Grid.Column="1" Text="{Binding Project}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="2" Text="{Binding Material}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="3" Text="{Binding Tool}" TextTrimming="CharacterEllipsis" />
+            <TextBlock Grid.Column="4" Text="{Binding Ratings}" />
+            <TextBlock Grid.Column="5" Text="{Binding Overrides}" />
+            <TextBlock Grid.Column="6" Text="{Binding Notes}" Classes="muted" TextTrimming="CharacterEllipsis" />
+          </Grid>
+        </DataTemplate>
+      </ListBox.ItemTemplate>
+    </ListBox>
+  </Grid>
+</UserControl>

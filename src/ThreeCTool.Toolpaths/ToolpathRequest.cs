@@ -43,4 +43,16 @@ public sealed class ToolpathRequest
 
     /// <summary>Dexel resolution of the rest-machining stock model; null picks one from the tool size.</summary>
     public double? StockResolution { get; init; }
+
+    /// <summary>
+    /// 3-axis: deepest cut below the (turned) stock top, resolved with <see cref="StockTurn.DepthLimit"/>; null when
+    /// unlimited.
+    /// </summary>
+    public double? DepthLimit { get; init; }
+
+    /// <summary>Tabs of every setup (<see cref="TabSolids"/>, part frame): material no operation may remove.</summary>
+    public Mesh? Tabs { get; init; }
+
+    /// <summary>Notes about the setup (e.g. from <see cref="TabSolids"/>) added to the toolpath warnings.</summary>
+    public IReadOnlyList<string> SetupWarnings { get; init; } = [];
 }

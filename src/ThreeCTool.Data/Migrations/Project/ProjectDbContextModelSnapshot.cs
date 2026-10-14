@@ -495,6 +495,9 @@ namespace ThreeCTool.Data.Migrations.Project
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Piece")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double?>("Rpm")
                         .HasColumnType("REAL");
 
@@ -720,6 +723,20 @@ namespace ThreeCTool.Data.Migrations.Project
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Anchor")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("DepthLimit")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Face")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("FrameWidth")
+                        .HasColumnType("REAL");
+
                     b.Property<double>("IndexAngle")
                         .HasColumnType("REAL");
 
@@ -740,6 +757,18 @@ namespace ThreeCTool.Data.Migrations.Project
 
                     b.Property<string>("RotaryCenterName")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("Spin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TabCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("TabThickness")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("TabWidth")
+                        .HasColumnType("REAL");
 
                     b.Property<double>("WcsOffsetX")
                         .HasColumnType("REAL");
@@ -790,6 +819,30 @@ namespace ThreeCTool.Data.Migrations.Project
                     b.Property<double>("OriginZ")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("PieceName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("PieceSizeX")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("PieceSizeY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("PieceSizeZ")
+                        .HasColumnType("REAL");
+
+                    b.PrimitiveCollection<string>("SeamsX")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("SeamsY")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("SeamsZ")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<double>("SizeX")
                         .HasColumnType("REAL");
 
@@ -836,6 +889,9 @@ namespace ThreeCTool.Data.Migrations.Project
 
                     b.Property<Guid>("OperationId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Piece")
+                        .HasColumnType("INTEGER");
 
                     b.Property<double>("RapidLength")
                         .HasColumnType("REAL");
@@ -1684,6 +1740,12 @@ namespace ThreeCTool.Data.Migrations.Project
 
                             b1.Property<string>("Kind")
                                 .IsRequired();
+
+                            b1.Property<double>("PivotX");
+
+                            b1.Property<double>("PivotY");
+
+                            b1.Property<double>("PivotZ");
 
                             b1.Property<double>("X");
 

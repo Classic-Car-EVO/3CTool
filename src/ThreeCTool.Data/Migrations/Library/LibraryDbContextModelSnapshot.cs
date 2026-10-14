@@ -385,6 +385,36 @@ namespace ThreeCTool.Data.Migrations.Library
                     b.ToTable("Materials");
                 });
 
+            modelBuilder.Entity("ThreeCTool.Core.Materials.StockSize", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("TEXT");
+
+                    b.Property<Guid?>("MaterialId")
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<string>("Notes")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("SizeX")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("SizeY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("SizeZ")
+                        .HasColumnType("REAL");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("StockSizes");
+                });
+
             modelBuilder.Entity("ThreeCTool.Core.Printing.PrintProfile", b =>
                 {
                     b.Property<Guid>("Id")

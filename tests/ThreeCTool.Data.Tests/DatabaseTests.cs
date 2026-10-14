@@ -104,9 +104,72 @@ public sealed class DatabaseTests : IDisposable
     }
 
     [Fact]
+    public async Task StockSize_RoundTrips()
+    {
+        var size = new StockSize { Name = "Plywood 18", MaterialId = BuiltInLibrary.IdFor("material:softwood"), SizeX = 2440, SizeY = 1220, SizeZ = 18, Notes = "B/BB" };
+        await using (var db = await LibraryDatabase.OpenAsync(LibraryPath))
+        {
+            db.StockSizes.Add(size);
+            await db.SaveChangesAsync();
+        }
+
+        await using var reopened = await LibraryDatabase.OpenAsync(LibraryPath);
+        var loaded = await reopened.StockSizes.SingleAsync();
+        Assert.Equal((size.Id, "Plywood 18", size.MaterialId, 2440.0, 1220.0, 18.0, "B/BB"), (loaded.Id, loaded.Name, loaded.MaterialId, loaded.SizeX, loaded.SizeY, loaded.SizeZ, loaded.Notes));
+    }
+
+    [Fact]
+    public async Task Project_SplitStockAndPieceResults_RoundTrip()
+    {
+        var stock = new Stock { Type = StockType.Box, SizeX = 1200, SizeY = 300, SizeZ = 36 };
+        StockTiling.Fit(stock, "Board", 600, 300, 18, null, 0);
+        var operationId = Guid.NewGuid();
+        await using (var db = await ProjectDatabase.OpenAsync(ProjectFolder))
+        {
+            db.Stocks.Add(stock);
+            db.ToolpathResults.Add(new ToolpathResult { OperationId = operationId, Piece = 2, InputHash = "h", CachePath = "c" });
+            db.GcodeFiles.Add(new GcodeFile { Path = "gcode/P02_01_Top_T01_Flat.nc", Piece = 2 });
+            await db.SaveChangesAsync();
+        }
+
+        await using (var db = await ProjectDatabase.OpenAsync(ProjectFolder))
+        {
+            var loaded = await db.Stocks.SingleAsync();
+            Assert.Equal("Board", loaded.PieceName);
+            Assert.Equal((600.0, 300.0, 18.0), (loaded.PieceSizeX, loaded.PieceSizeY, loaded.PieceSizeZ));
+            Assert.Equal([600.0], loaded.SeamsX);
+            Assert.Empty(loaded.SeamsY);
+            Assert.Equal([18.0], loaded.SeamsZ);
+            Assert.Equal(4, StockTiling.Pieces(loaded).Count);
+
+            loaded.SeamsX = [550];
+            await db.SaveChangesAsync();
+            Assert.Equal(2, (await db.ToolpathResults.SingleAsync()).Piece);
+            Assert.Equal(2, (await db.GcodeFiles.SingleAsync()).Piece);
+        }
+
+        await using (var db = await ProjectDatabase.OpenAsync(ProjectFolder))
+        {
+            Assert.Equal([550.0], (await db.Stocks.SingleAsync()).SeamsX);
+        }
+    }
+
+    [Fact]
     public async Task Project_SetupWithOperations_RoundTripsAndCascades()
     {
-        var setup = new Setup { Name = "Top", WorkOffset = WorkOffset.G55 };
+        var setup = new Setup
+        {
+            Name = "Top",
+            WorkOffset = WorkOffset.G55,
+            Face = StockFace.Left,
+            Spin = 270,
+            Anchor = TurnAnchor.FrontLeft,
+            DepthLimit = 12.5,
+            TabCount = 3,
+            TabWidth = 5,
+            TabThickness = 1.5,
+            FrameWidth = 8,
+        };
         setup.Operations.Add(new Operation
         {
             SetupId = setup.Id,
@@ -130,6 +193,11 @@ public sealed class DatabaseTests : IDisposable
 
             var loaded = await db.Setups.Include(s => s.Operations).SingleAsync();
             Assert.Equal(WorkOffset.G55, loaded.WorkOffset);
+            Assert.Equal(StockFace.Left, loaded.Face);
+            Assert.Equal(270, loaded.Spin);
+            Assert.Equal(TurnAnchor.FrontLeft, loaded.Anchor);
+            Assert.Equal(12.5, loaded.DepthLimit);
+            Assert.Equal((3, 5.0, 1.5, 8.0), (loaded.TabCount, loaded.TabWidth, loaded.TabThickness, loaded.FrameWidth));
             var operation = Assert.Single(loaded.Operations);
             Assert.Equal(2.5, operation.Parameters.Stepover);
             Assert.Equal(EntryMode.Ramp, operation.Parameters.Entry);

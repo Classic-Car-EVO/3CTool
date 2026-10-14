@@ -6,7 +6,7 @@ namespace ThreeCTool.Rendering;
 /// What a tool path view shows: path, camera, progress and tool marker. Shared by the GL view and the 2D fallback;
 /// <see cref="Changed"/> asks views to redraw.
 /// </summary>
-public sealed class ToolpathScene
+public sealed class ToolpathScene : IOrbitScene
 {
     private int progressLine;
     private Vector3? marker;

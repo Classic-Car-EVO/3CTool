@@ -4,10 +4,18 @@
     <TargetFramework>net10.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
   </PropertyGroup>
 
   <ItemGroup>
-    <Folder Include="Models\" />
+    <InternalsVisibleTo Include="ThreeCTool.Desktop.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+  <ItemGroup>
     <AvaloniaResource Include="Assets\**" />
   </ItemGroup>
 
@@ -21,6 +29,7 @@
       <PrivateAssets Condition="'$(Configuration)' != 'Debug'">All</PrivateAssets>
     </PackageReference>
     <PackageReference Include="CommunityToolkit.Mvvm" />
+    <PackageReference Include="System.Security.Cryptography.ProtectedData" />
   </ItemGroup>
 
   <ItemGroup>
@@ -38,5 +47,7 @@
     <ProjectReference Include="..\ThreeCTool.Rendering\ThreeCTool.Rendering.csproj" />
     <ProjectReference Include="..\ThreeCTool.Streaming\ThreeCTool.Streaming.csproj" />
     <ProjectReference Include="..\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeder.Service\ThreeCTool.Feeder.Service.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeder.Client\ThreeCTool.Feeder.Client.csproj" />
   </ItemGroup>
 </Project>

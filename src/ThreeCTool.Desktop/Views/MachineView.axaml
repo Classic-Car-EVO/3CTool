@@ -1,0 +1,173 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:fviews="using:ThreeCTool.Feeder.Views"
+             xmlns:m="using:ThreeCTool.Core.Machines"
+             x:Class="ThreeCTool.Desktop.Views.MachineView"
+             x:DataType="vm:MachineViewModel">
+  <Grid ColumnDefinitions="380,*" Margin="0,4,0,0">
+    <ScrollViewer Margin="0,0,12,0">
+      <StackPanel Margin="0,0,14,8">
+        <!-- Connections -->
+        <TextBlock Text="Connection" Classes="section" Margin="0,0,0,4" />
+        <ListBox Name="Connections" ItemsSource="{Binding Connections}" SelectedItem="{Binding SelectedConnection}" MaxHeight="220">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:MachineConnection">
+              <StackPanel>
+                <TextBlock Text="{Binding Name}" />
+                <TextBlock Text="{Binding Details}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <WrapPanel Margin="0,6,0,0">
+          <Button Name="Connect" Content="Connect" Classes="primary" Command="{Binding ConnectCommand}" Margin="0,0,4,4" />
+          <Button Name="Disconnect" Content="Disconnect" Command="{Binding DisconnectCommand}" Margin="0,0,12,4" />
+          <Button Name="StartPairing" Content="Pair feeder..." Command="{Binding StartPairingCommand}" Margin="0,0,4,4" />
+          <Button Name="Forget" Content="Forget" Command="{Binding ForgetCommand}" Margin="0,0,4,4" />
+        </WrapPanel>
+        <Grid ColumnDefinitions="110,*" Margin="0,2,0,0">
+          <TextBlock Text="Drives machine" VerticalAlignment="Center" />
+          <ComboBox Grid.Column="1" Name="LinkedMachine" ItemsSource="{Binding Machines}" SelectedItem="{Binding LinkedMachine}"
+                    HorizontalAlignment="Stretch" PlaceholderText="Not linked">
+            <ComboBox.ItemTemplate>
+              <DataTemplate x:DataType="m:MachineProfile"><TextBlock Text="{Binding Name}" /></DataTemplate>
+            </ComboBox.ItemTemplate>
+          </ComboBox>
+        </Grid>
+
+        <Border Classes="card" IsVisible="{Binding IsPairing}" Margin="0,8,0,0">
+          <StackPanel Spacing="4">
+            <TextBlock Text="Pair a feeder" FontWeight="SemiBold" />
+            <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                       Text="On the feeder, open Setup and press 'Pair a desktop'. Enter its address and the code it shows." />
+            <TextBox Name="PairAddress" Text="{Binding PairAddress}" PlaceholderText="Address (e.g. feeder.local:5443)" />
+            <TextBox Name="PairCode" Text="{Binding PairCode}" PlaceholderText="Pairing code" />
+            <TextBox Name="PairName" Text="{Binding PairName}" PlaceholderText="Name of this computer" />
+            <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Right">
+              <Button Content="Cancel" Command="{Binding CancelPairingCommand}" />
+              <Button Name="Pair" Content="Pair" Classes="primary" Command="{Binding PairCommand}" />
+            </StackPanel>
+          </StackPanel>
+        </Border>
+
+        <!-- Send G-code -->
+        <TextBlock Text="Send job" Classes="section" />
+        <TextBlock Text="{Binding FilesText}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+        <ListBox Name="GcodeFiles" ItemsSource="{Binding Files}" SelectedItem="{Binding SelectedFile}" MaxHeight="200" Margin="0,4,0,0"
+                 IsVisible="{Binding !!Files.Count}">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:GcodeRow">
+              <StackPanel>
+                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <Grid ColumnDefinitions="*,Auto,Auto" Margin="0,6,0,0">
+          <ProgressBar Value="{Binding UploadProgress}" Minimum="0" Maximum="100" IsVisible="{Binding IsUploading}" VerticalAlignment="Center" />
+          <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshFilesCommand}" Margin="6,0,4,0" />
+          <Button Grid.Column="2" Name="UploadJob" Content="Send to feeder" Classes="primary" Command="{Binding UploadCommand}" />
+        </Grid>
+
+        <!-- Machine profile -->
+        <TextBlock Text="Machine profile" Classes="section" />
+        <TextBlock Classes="muted" FontSize="12" TextWrapping="Wrap"
+                   Text="Import the controller's configuration into the linked profile, or set up the direct connection from the profile." />
+        <WrapPanel Margin="0,4,0,0">
+          <Button Name="ImportConfig" Content="Import controller config" Command="{Binding ImportConfigCommand}" Margin="0,0,4,4" />
+          <Button Name="ApplyMachineSettings" Content="Use profile settings" Command="{Binding ApplyMachineSettingsCommand}" Margin="0,0,4,4" />
+        </WrapPanel>
+
+        <!-- Learning -->
+        <TextBlock Text="Run feedback" Classes="section" />
+        <Button Name="SyncFeedback" Content="Sync feedback to library" Command="{Binding SyncFeedbackCommand}" />
+        <TextBlock Name="SyncSummary" Text="{Binding SyncSummary}" Classes="muted" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
+
+        <!-- Run history -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="Run history" Classes="section" />
+          <Button Grid.Column="1" Content="Refresh" Command="{Binding RefreshRunsCommand}" VerticalAlignment="Bottom" />
+        </Grid>
+        <ListBox Name="Runs" ItemsSource="{Binding Runs}" SelectedItem="{Binding SelectedRun}" MaxHeight="220" Margin="0,4,0,0">
+          <ListBox.ItemTemplate>
+            <DataTemplate x:DataType="vm:RunRow">
+              <StackPanel>
+                <TextBlock Text="{Binding Title}" TextTrimming="CharacterEllipsis" />
+                <TextBlock Text="{Binding Detail}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+              </StackPanel>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+        <ItemsControl Name="RunLog" ItemsSource="{Binding RunLog}" Margin="0,4,0,0">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate x:DataType="x:String">
+              <TextBlock Text="{Binding}" FontFamily="monospace" FontSize="12" TextWrapping="Wrap" />
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </ScrollViewer>
+
+    <!-- The feeder's own UI (same view models as the touch screen), dark like the machine panel. -->
+    <ThemeVariantScope Grid.Column="1" RequestedThemeVariant="Dark">
+      <ThemeVariantScope.Resources>
+        <SolidColorBrush x:Key="PanelBrush" Color="#1E2226" />
+        <SolidColorBrush x:Key="WarningBrush" Color="#E0A000" />
+      </ThemeVariantScope.Resources>
+      <ThemeVariantScope.Styles>
+        <Style Selector="Button.selected">
+          <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+          <Setter Property="Foreground" Value="White" />
+        </Style>
+        <Style Selector="Button.jog">
+          <Setter Property="MinWidth" Value="56" />
+          <Setter Property="MinHeight" Value="48" />
+          <Setter Property="FontSize" Value="17" />
+          <Setter Property="FontWeight" Value="SemiBold" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+          <Setter Property="VerticalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="Button.key">
+          <Setter Property="MinWidth" Value="44" />
+          <Setter Property="MinHeight" Value="38" />
+          <Setter Property="Margin" Value="2" />
+          <Setter Property="HorizontalContentAlignment" Value="Center" />
+        </Style>
+        <Style Selector="TextBlock.label">
+          <Setter Property="Foreground" Value="{StaticResource MutedBrush}" />
+          <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="TextBlock.value">
+          <Setter Property="FontSize" Value="17" />
+          <Setter Property="FontFamily" Value="monospace" />
+        </Style>
+        <Style Selector="Border.panel">
+          <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+          <Setter Property="CornerRadius" Value="8" />
+          <Setter Property="Padding" Value="12" />
+        </Style>
+        <Style Selector="Border.dialog">
+          <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+          <Setter Property="BorderBrush" Value="#3A4048" />
+          <Setter Property="BorderThickness" Value="1" />
+          <Setter Property="CornerRadius" Value="10" />
+          <Setter Property="Padding" Value="16" />
+          <Setter Property="HorizontalAlignment" Value="Center" />
+          <Setter Property="VerticalAlignment" Value="Center" />
+          <Setter Property="MaxWidth" Value="760" />
+        </Style>
+      </ThemeVariantScope.Styles>
+      <Panel>
+        <Border Background="#121518" CornerRadius="6" IsVisible="{Binding !IsConnected}">
+          <TextBlock Foreground="#9AA4AE" HorizontalAlignment="Center" VerticalAlignment="Center" TextAlignment="Center" TextWrapping="Wrap" Margin="24"
+                     Text="Not connected. Choose the direct connection (controller on this computer) or a paired feeder, then press Connect." />
+        </Border>
+        <Panel IsVisible="{Binding IsConnected}">
+          <fviews:MainView Name="FeederView" DataContext="{Binding Feeder}" />
+        </Panel>
+      </Panel>
+    </ThemeVariantScope>
+  </Grid>
+</UserControl>

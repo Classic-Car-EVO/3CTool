@@ -208,7 +208,7 @@ internal sealed class PreparedStep
             case MillingStep milling:
             {
                 var moves = milling.Toolpath.Moves;
-                var segments = Expand(milling.Toolpath.Frame, moves.Count, i => moves[i], i => moves[i].Kind == MoveKind.Rapid, _ => (0, 0), maxAngleStep);
+                var segments = Expand(milling.Toolpath.Frame, moves.Count, i => moves[i], i => moves[i].Kind == MoveKind.Rapid, _ => (0, 0), maxAngleStep, exactEnds: true);
                 return new PreparedStep(step, milling.Toolpath.Frame, segments, moves.Count) { Cutter = CutterProfile.FromTool(milling.Tool) };
             }
 
@@ -221,7 +221,8 @@ internal sealed class PreparedStep
                     i => new ToolpathMove(moves[i].Kind == PrintMoveKind.Travel ? MoveKind.Rapid : MoveKind.Cut, moves[i].X, moves[i].Y, moves[i].Z, moves[i].A),
                     i => moves[i].Kind == PrintMoveKind.Travel,
                     i => ((float)moves[i].Width, (float)moves[i].Height),
-                    maxAngleStep);
+                    maxAngleStep,
+                    exactEnds: false);
                 return new PreparedStep(step, deposition.Frame, segments, moves.Count);
             }
 
@@ -295,13 +296,21 @@ internal sealed class PreparedStep
         WcsTo = Vector3.Lerp(s.WcsFrom, s.WcsTo, t1),
     };
 
+    /// <summary>
+    /// Splits moves into straight pieces; simultaneous rotary moves become pieces of at most
+    /// <paramref name="maxAngleStep"/> each swept with the axis at its middle. With <paramref name="exactEnds"/>, a
+    /// turning move also gets a stationary piece at its end with the true end axis: the tilted last piece lags the
+    /// final cutter pose by up to half a step times the cutter length, which would leave a sliver for the next move to
+    /// run into.
+    /// </summary>
     private static List<Segment> Expand(
         SetupFrame frame,
         int count,
         Func<int, ToolpathMove> move,
         Func<int, bool> rapid,
         Func<int, (float Width, float Height)> bead,
-        double maxAngleStep)
+        double maxAngleStep,
+        bool exactEnds)
     {
         var result = new List<Segment>(count);
         for (var i = 1; i < count; i++)
@@ -320,6 +329,12 @@ internal sealed class PreparedStep
                 var wcsTo = Lerp(from, to, t);
                 result.Add(new Segment(new ToolMove(previous.Tip, current.Tip, axis), ToVector(wcsFrom.Position), ToVector(wcsTo.Position), i, rapid(i), !rapid(i), width, height));
                 previous = current;
+            }
+
+            if (turning && exactEnds)
+            {
+                var end = ToVector(to.Position);
+                result.Add(new Segment(new ToolMove(previous.Tip, previous.Tip, previous.Axis), end, end, i, rapid(i), !rapid(i), width, height));
             }
         }
 

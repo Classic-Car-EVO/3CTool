@@ -101,13 +101,15 @@ internal static class Kit
             KeepOuts = o.KeepOuts,
             WorkOffsets = o.WorkOffsets,
             Steps = steps,
-            Options = new SimulationOptions { Resolution = o.Resolution },
+            Options = new SimulationOptions { Resolution = o.Resolution, MaxAngleStep = o.MaxAngleStep },
         };
     }
 
     internal sealed class JobOptions
     {
         public float Resolution { get; set; } = 0.5f;
+
+        public double MaxAngleStep { get; set; } = 0.5;
 
         public MachineProfile? Machine { get; set; }
 

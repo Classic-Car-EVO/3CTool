@@ -18,9 +18,14 @@ public static class ToolpathGenerator
             throw new InvalidOperationException($"{operation.Strategy} needs a simultaneous rotary setup.");
         }
 
-        var warnings = new List<string>();
+        var warnings = new List<string>(request.SetupWarnings);
         var settings = ToolpathSettings.Resolve(operation, request.Tool, request.Tolerances);
         using var setup = MachiningSetup.Create(request);
+        if (setup.Floor is { } floor)
+        {
+            settings = settings with { MinZ = Math.Max(settings.MinZ ?? double.MinValue, floor) };
+        }
+
         var context = new StrategyContext(request, setup, settings, warnings, progress, cancellationToken);
         var builder = rotary ? RotaryMachining.NewBuilder(context) : context.NewBuilder();
         switch (operation.Strategy)
@@ -57,6 +62,12 @@ public static class ToolpathGenerator
         }
 
         var moves = builder.Finish();
+        if (setup.Floor is { } limit && moves.Exists(m => m.Z < limit))
+        {
+            // The depth limit is a hard floor: raising a tip never cuts more.
+            moves = [.. moves.Select(m => m.Z < limit ? m with { Z = limit } : m)];
+        }
+
         if (builder.PlungeEntries > 0)
         {
             warnings.Add($"{builder.PlungeEntries} entr{(builder.PlungeEntries == 1 ? "y plunges" : "ies plunge")} straight into material (no room for a helix or ramp).");

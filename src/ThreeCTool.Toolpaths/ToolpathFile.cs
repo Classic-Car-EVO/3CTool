@@ -5,11 +5,14 @@ using ThreeCTool.Core.Projects;
 
 namespace ThreeCTool.Toolpaths;
 
-/// <summary>Cached toolpath file: gzip-compressed binary, magic "3CTP", version 1, little-endian.</summary>
+/// <summary>
+/// Cached toolpath file: gzip-compressed binary, magic "3CTP", version 2 (adds the turned stock face and spin to the
+/// frame; version 1 still reads), little-endian.
+/// </summary>
 public static class ToolpathFile
 {
     private const uint Magic = 0x50544333; // "3CTP"
-    private const int Version = 1;
+    private const int Version = 2;
 
     public static void Save(Toolpath toolpath, string path)
     {
@@ -39,6 +42,8 @@ public static class ToolpathFile
         writer.Write(frame.OriginY);
         writer.Write(frame.OriginZ);
         writer.Write(frame.IndexAngle);
+        writer.Write((int)frame.Face);
+        writer.Write(frame.Spin);
         writer.Write(toolpath.Clearance);
         writer.Write(toolpath.Warnings.Count);
         foreach (var warning in toolpath.Warnings)
@@ -67,7 +72,7 @@ public static class ToolpathFile
         }
 
         var version = reader.ReadInt32();
-        if (version != Version)
+        if (version is < 1 or > Version)
         {
             throw new InvalidDataException($"Unsupported toolpath file version {version}.");
         }
@@ -76,6 +81,10 @@ public static class ToolpathFile
         var strategy = (StrategyType)reader.ReadInt32();
         var toolId = new Guid(reader.ReadBytes(16));
         var frame = new SetupFrame((SetupOrientation)reader.ReadInt32(), reader.ReadDouble(), reader.ReadDouble(), reader.ReadDouble(), reader.ReadDouble());
+        if (version >= 2)
+        {
+            frame = frame with { Face = (StockFace)reader.ReadInt32(), Spin = reader.ReadInt32() };
+        }
         var clearance = reader.ReadDouble();
         var warnings = new List<string>();
         for (var i = reader.ReadInt32(); i > 0; i--)

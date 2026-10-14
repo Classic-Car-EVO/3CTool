@@ -19,9 +19,44 @@ public static class MeshTransforms
     public static TransformStep Translate(Vector3 offset) =>
         new() { Kind = TransformKind.Translate, X = offset.X, Y = offset.Y, Z = offset.Z };
 
+    /// <summary>Copy of a rotate or scale <paramref name="step"/> acting about <paramref name="pivot"/>.</summary>
+    public static TransformStep About(TransformStep step, Vector3 pivot)
+    {
+        ArgumentNullException.ThrowIfNull(step);
+        if (step.Kind == TransformKind.Translate)
+        {
+            throw new ArgumentException("A translation has no pivot.", nameof(step));
+        }
+
+        return new TransformStep
+        {
+            Kind = step.Kind,
+            X = step.X,
+            Y = step.Y,
+            Z = step.Z,
+            AngleDegrees = step.AngleDegrees,
+            Factor = step.Factor,
+            PivotX = pivot.X,
+            PivotY = pivot.Y,
+            PivotZ = pivot.Z,
+        };
+    }
+
     public static Matrix4x4 ToMatrix(TransformStep step)
     {
         ArgumentNullException.ThrowIfNull(step);
+        var linear = Linear(step);
+        if (step.Kind == TransformKind.Translate || (step.PivotX == 0 && step.PivotY == 0 && step.PivotZ == 0))
+        {
+            return linear;
+        }
+
+        var pivot = new Vector3((float)step.PivotX, (float)step.PivotY, (float)step.PivotZ);
+        return Matrix4x4.CreateTranslation(-pivot) * linear * Matrix4x4.CreateTranslation(pivot);
+    }
+
+    private static Matrix4x4 Linear(TransformStep step)
+    {
         switch (step.Kind)
         {
             case TransformKind.Rotate:

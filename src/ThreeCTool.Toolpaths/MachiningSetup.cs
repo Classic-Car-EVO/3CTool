@@ -21,7 +21,7 @@ public sealed class MachiningSetup : IDisposable
     private readonly Lazy<PathsD> _stockFootprint;
     private readonly Lazy<PathsD> _partSilhouette;
 
-    private MachiningSetup(ComputeContext compute, SetupFrame frame, Mesh part, Mesh stock, Mesh? obstacles, double stockRadius)
+    private MachiningSetup(ComputeContext compute, SetupFrame frame, Mesh part, Mesh stock, Mesh? obstacles, double stockRadius, double? floor)
     {
         Compute = compute;
         Frame = frame;
@@ -31,6 +31,7 @@ public sealed class MachiningSetup : IDisposable
         PartGpu = new GpuMesh(compute, part);
         ObstaclesGpu = obstacles is null ? null : new GpuMesh(compute, obstacles);
         StockRadius = stockRadius;
+        Floor = floor;
         _stockFootprint = new(() => MeshSlicer.Silhouette(Stock));
         _partSilhouette = new(() => MeshSlicer.Silhouette(Part));
     }
@@ -57,6 +58,9 @@ public sealed class MachiningSetup : IDisposable
     /// <summary>Largest distance of the stock from the X axis (the rotary axis in rotary frames).</summary>
     public double StockRadius { get; }
 
+    /// <summary>Lowest tip Z allowed by the setup's depth limit (working frame); null when unlimited.</summary>
+    public double? Floor { get; }
+
     /// <summary>Highest point of stock, part and keep-outs in the working frame.</summary>
     public double TopZ => Math.Max(Math.Max(StockBounds.Max.Z, PartBounds.Max.Z), Obstacles?.Bounds.Max.Z ?? double.MinValue);
 
@@ -79,7 +83,13 @@ public sealed class MachiningSetup : IDisposable
         var radius = request.Stock.Type == StockType.Cylinder
             ? request.Stock.Diameter / 2
             : stock.Vertices.Max(v => Math.Sqrt(((double)v.Y * v.Y) + ((double)v.Z * v.Z)));
-        return new MachiningSetup(request.Compute, frame, request.Part.Transform(matrix), stock, obstacles, radius);
+
+        // Tabs are material to keep: the tool treats them like the part.
+        var part = request.Tabs is { TriangleCount: > 0 } tabs ? Mesh.Merge([request.Part, tabs], "part") : request.Part;
+        double? floor = !frame.IsRotary && request.DepthLimit is { } depth && stock.Bounds.Max.Z - depth > stock.Bounds.Min.Z + 1e-6
+            ? stock.Bounds.Max.Z - depth
+            : null;
+        return new MachiningSetup(request.Compute, frame, part.Transform(matrix), stock, obstacles, radius, floor);
     }
 
     public static SetupFrame CreateFrame(Setup setup, Stock stock, BoundingBox stockBounds)
@@ -100,9 +110,28 @@ public sealed class MachiningSetup : IDisposable
         x += setup.WcsOffsetX;
 
         // Rotary setups keep the WCS Y/Z origin on the rotation axis; only X is free.
-        return setup.Orientation == SetupOrientation.ThreeAxis
-            ? new SetupFrame(setup.Orientation, x, y + setup.WcsOffsetY, z + setup.WcsOffsetZ, 0)
-            : new SetupFrame(setup.Orientation, x, axisY, axisZ, setup.Orientation == SetupOrientation.Indexed ? setup.IndexAngle : 0);
+        if (setup.Orientation != SetupOrientation.ThreeAxis)
+        {
+            return new SetupFrame(setup.Orientation, x, axisY, axisZ, setup.Orientation == SetupOrientation.Indexed ? setup.IndexAngle : 0);
+        }
+
+        (y, z) = (y + setup.WcsOffsetY, z + setup.WcsOffsetZ);
+        if (stock.Type != StockType.Box)
+        {
+            return new SetupFrame(setup.Orientation, x, y, z, 0);
+        }
+
+        // A turned stock goes back into the jig, so the WCS stays at the same machine point (taken on the stock as
+        // it lies unturned): w = R·p + T − O, stored as the origin O − T in turned coordinates.
+        var size = stockBounds.Size;
+        var spin = StockTurn.ResolveSpin(setup, size.X, size.Y, size.Z);
+        var shift = StockTurn.Placement(
+            setup.Face,
+            spin,
+            setup.Anchor,
+            (stockBounds.Min.X, stockBounds.Min.Y, stockBounds.Min.Z),
+            (stockBounds.Max.X, stockBounds.Max.Y, stockBounds.Max.Z));
+        return new SetupFrame(setup.Orientation, x - shift.X, y - shift.Y, z - shift.Z, 0, setup.Face, spin);
     }
 
     /// <summary>Stock material just below height <paramref name="z"/> (cached).</summary>

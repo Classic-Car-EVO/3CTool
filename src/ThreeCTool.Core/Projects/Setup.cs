@@ -27,6 +27,35 @@ public enum WcsReference
     RotaryAxis,
 }
 
+/// <summary>Face of a box stock that faces up on a 3-axis setup; the operator turns the stock by hand in 90° steps.</summary>
+public enum StockFace
+{
+    Top,
+    Bottom,
+
+    /// <summary>The −Y face.</summary>
+    Front,
+
+    /// <summary>The +Y face.</summary>
+    Back,
+
+    /// <summary>The −X face.</summary>
+    Left,
+
+    /// <summary>The +X face.</summary>
+    Right,
+}
+
+/// <summary>Where the turning jig locates a turned stock on the table (its bottom always rests on the table).</summary>
+public enum TurnAnchor
+{
+    /// <summary>Centred on the jig (dowel pins on the stock centre lines): the XY centre stays put.</summary>
+    Center,
+
+    /// <summary>Pushed into the front-left corner stops: the front-left corner stays put.</summary>
+    FrontLeft,
+}
+
 public sealed class Setup
 {
     public Guid Id { get; set; } = Guid.CreateVersion7();
@@ -54,6 +83,32 @@ public sealed class Setup
     public double WcsOffsetZ { get; set; }
 
     public ProbeMethod ProbeMethod { get; set; } = ProbeMethod.ToolSetter;
+
+    /// <summary>3-axis: stock face turned up for this setup (box stock only).</summary>
+    public StockFace Face { get; set; } = StockFace.Top;
+
+    /// <summary>3-axis: turn about the vertical axis after <see cref="Face"/> (0, 90, 180, 270); null picks it automatically.</summary>
+    public int? Spin { get; set; }
+
+    /// <summary>3-axis: how the jig locates the stock after it was turned.</summary>
+    public TurnAnchor Anchor { get; set; } = TurnAnchor.Center;
+
+    /// <summary>
+    /// 3-axis: deepest cut below the turned stock top (mm). Null picks it: half the stock when another setup machines
+    /// the opposite face, else unlimited.
+    /// </summary>
+    public double? DepthLimit { get; set; }
+
+    /// <summary>3-axis: tabs left at the depth limit plane to hold the part in the stock (0 = none).</summary>
+    public int TabCount { get; set; }
+
+    public double TabWidth { get; set; } = 6;
+
+    /// <summary>Tab thickness, centred on the depth limit plane.</summary>
+    public double TabThickness { get; set; } = 2;
+
+    /// <summary>With tabs: width of the stock border kept all round as the frame the tabs hold on to.</summary>
+    public double FrameWidth { get; set; } = 10;
 
     public List<Operation> Operations { get; set; } = [];
 
@@ -125,6 +180,9 @@ public sealed class ToolpathResult
     /// <summary><see cref="Operation"/> or <see cref="PrintOperation"/> id.</summary>
     public Guid OperationId { get; set; }
 
+    /// <summary>Stock piece number (1-based) when the stock is split into pieces; 0 otherwise.</summary>
+    public int Piece { get; set; }
+
     public string InputHash { get; set; } = string.Empty;
 
     public string CachePath { get; set; } = string.Empty;
@@ -145,6 +203,9 @@ public sealed class GcodeFile
     public Guid Id { get; set; } = Guid.CreateVersion7();
 
     public Guid SetupId { get; set; }
+
+    /// <summary>Stock piece number (1-based) the file machines when the stock is split into pieces; 0 otherwise.</summary>
+    public int Piece { get; set; }
 
     public ToolheadType Head { get; set; }
 

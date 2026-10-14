@@ -48,7 +48,15 @@ public sealed class MachineControlTests
         for (var i = 0; i < 4; i++)
         {
             await Task.Delay(100);
-            await call.RequestStream.WriteAsync(new JogHold());
+            try
+            {
+                await call.RequestStream.WriteAsync(new JogHold());
+            }
+            catch (RpcException ex) when (ex.StatusCode == StatusCode.OK)
+            {
+                // A heavily loaded runner delayed this keep-alive past the watchdog, which already ended the call.
+                break;
+            }
         }
 
         // No more keep-alives: the watchdog cancels the jog although the stream is still open.

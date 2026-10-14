@@ -1,0 +1,105 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:t="using:ThreeCTool.Core.Tooling"
+             xmlns:l="using:ThreeCTool.Core.Learning"
+             x:Class="ThreeCTool.Desktop.Views.ToolsView"
+             x:DataType="vm:ToolsViewModel">
+  <Grid ColumnDefinitions="300,*" Margin="0,8,0,0">
+    <DockPanel Margin="0,0,12,0">
+      <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <Button Name="NewTool" Content="New" Command="{Binding NewCommand}" Margin="0,0,4,4" />
+        <Button Name="DuplicateTool" Content="Duplicate" Command="{Binding DuplicateCommand}" Margin="0,0,4,4" />
+        <Button Name="DeleteTool" Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,4,4" />
+      </WrapPanel>
+      <ListBox Name="ToolList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="t:Tool">
+            <StackPanel>
+              <TextBlock Text="{Binding Name}" />
+              <TextBlock Classes="muted" FontSize="12">
+                <Run Text="{Binding Type}" /><Run Text=", " /><Run Text="{Binding FluteCount}" /><Run Text=" flutes, " /><Run Text="{Binding Status}" />
+              </TextBlock>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+
+    <Grid Grid.Column="1" RowDefinitions="*,Auto" DataContext="{Binding Editor}" x:DataType="vm:ToolEditorViewModel"
+          IsVisible="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <ScrollViewer>
+        <StackPanel Margin="0,0,16,0" MaxWidth="900" HorizontalAlignment="Left">
+          <TextBlock Text="Tool" Classes="section" Margin="0,0,0,4" />
+          <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,2">
+            <TextBlock Text="Name" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Name="ToolName" Text="{Binding Model.Name}" />
+            <TextBlock Grid.Row="1" Text="Type" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="1" Grid.Column="1" Name="ToolType" ItemsSource="{x:Static vm:ToolEditorViewModel.Types}" SelectedItem="{Binding Type, Mode=TwoWay}" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="2" Text="Tool material" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="2" Grid.Column="1" ItemsSource="{x:Static vm:ToolEditorViewModel.Materials}" SelectedItem="{Binding Model.Material, Mode=TwoWay}" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="3" Text="Status" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="3" Grid.Column="1" ItemsSource="{x:Static vm:ToolEditorViewModel.Statuses}" SelectedItem="{Binding Model.Status, Mode=TwoWay}" Margin="0,4,0,0" />
+          </Grid>
+
+          <TextBlock Text="Geometry" Classes="section" />
+          <ContentControl Name="ToolDiameter" Content="{Binding Diameter}" />
+          <ContentControl Content="{Binding CornerRadius}" IsVisible="{Binding ShowCornerRadius}" />
+          <ContentControl Content="{Binding TipAngle}" IsVisible="{Binding ShowTipAngle}" />
+          <ContentControl Content="{Binding TaperAngle}" IsVisible="{Binding ShowTaper}" />
+          <ContentControl Content="{Binding TipDiameter}" IsVisible="{Binding ShowTipDiameter}" />
+          <ContentControl Content="{Binding FluteCount}" />
+          <ContentControl Content="{Binding FluteLength}" />
+          <ContentControl Content="{Binding HelixAngle}" />
+          <ContentControl Content="{Binding ShankDiameter}" />
+          <ContentControl Content="{Binding OverallLength}" />
+          <ContentControl Content="{Binding Stickout}" />
+          <ContentControl Content="{Binding MaxDepthOfCut}" />
+
+          <TextBlock Text="Supplier" Classes="section" />
+          <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto,Auto" Margin="0,2">
+            <TextBlock Text="Manufacturer" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Text="{Binding Model.Manufacturer}" />
+            <TextBlock Grid.Row="1" Text="Product code" VerticalAlignment="Center" />
+            <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding Model.ProductCode}" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="2" Text="Coating" VerticalAlignment="Center" />
+            <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding Model.Coating}" Margin="0,4,0,0" />
+            <TextBlock Grid.Row="3" Text="Notes" VerticalAlignment="Top" Margin="0,8,0,0" />
+            <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding Model.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" Margin="0,4,0,0" />
+          </Grid>
+
+          <StackPanel IsVisible="{Binding !IsNew}">
+            <TextBlock Text="Usage and wear" Classes="section" />
+            <TextBlock Name="ToolUsage" Text="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).UsageText}" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="*,Auto,Auto,Auto" Margin="0,6">
+              <TextBox Text="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).WearNotes}" PlaceholderText="Note (optional)" />
+              <Button Grid.Column="1" Name="LogReplaced" Content="Replaced" Margin="6,0,0,0"
+                      Command="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).LogWearCommand}" CommandParameter="{x:Static l:WearEventKind.Replaced}" />
+              <Button Grid.Column="2" Content="Worn" Margin="6,0,0,0"
+                      Command="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).LogWearCommand}" CommandParameter="{x:Static l:WearEventKind.Wear}" />
+              <Button Grid.Column="3" Content="Broken" Margin="6,0,0,0" Classes="danger"
+                      Command="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).LogWearCommand}" CommandParameter="{x:Static l:WearEventKind.Breakage}" />
+            </Grid>
+            <ItemsControl ItemsSource="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).WearLog}">
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="vm:WearRow">
+                  <Grid ColumnDefinitions="150,90,160,*">
+                    <TextBlock Text="{Binding When}" />
+                    <TextBlock Grid.Column="1" Text="{Binding Kind}" />
+                    <TextBlock Grid.Column="2" Text="{Binding Usage}" />
+                    <TextBlock Grid.Column="3" Text="{Binding Notes}" Classes="muted" TextTrimming="CharacterEllipsis" />
+                  </Grid>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </StackPanel>
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button Name="SaveTool" Content="Save" Classes="primary" Command="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).SaveCommand}" />
+        <Button Content="Revert" Command="{Binding $parent[UserControl].((vm:ToolsViewModel)DataContext).RevertCommand}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

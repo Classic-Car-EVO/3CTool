@@ -1,0 +1,49 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             x:Class="ThreeCTool.Desktop.Views.SetupEditorView"
+             x:DataType="vm:SetupEditor">
+  <StackPanel Spacing="4">
+    <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+      <TextBlock Text="Name" VerticalAlignment="Center" />
+      <TextBox Grid.Column="1" Name="SetupName" Text="{Binding Name}" />
+
+      <TextBlock Grid.Row="1" Text="Orientation" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="1" Grid.Column="1" Name="SetupOrientation" ItemsSource="{x:Static vm:SetupEditor.Orientations}"
+                SelectedItem="{Binding Orientation}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="2" Text="Rotary centre" VerticalAlignment="Center" IsVisible="{Binding IsRotary}" />
+      <ComboBox Grid.Row="2" Grid.Column="1" Name="SetupRotaryCenter" ItemsSource="{Binding RotaryCenters}" SelectedItem="{Binding RotaryCenter}"
+                IsVisible="{Binding IsRotary}" IsEnabled="{Binding HasRotaryCenters}" PlaceholderText="Machine has no saved centres"
+                HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="3" Text="Work offset" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="3" Grid.Column="1" Name="SetupWorkOffset" ItemsSource="{x:Static vm:SetupEditor.WorkOffsets}"
+                SelectedItem="{Binding WorkOffset}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="4" Text="Zero reference" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="4" Grid.Column="1" Name="SetupReference" ItemsSource="{x:Static vm:SetupEditor.References}"
+                SelectedItem="{Binding Reference}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="5" Text="Probing" VerticalAlignment="Center" />
+      <ComboBox Grid.Row="5" Grid.Column="1" Name="SetupProbe" ItemsSource="{x:Static vm:SetupEditor.ProbeMethods}"
+                SelectedItem="{Binding Probe}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="6" Text="Stock face up" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
+      <ComboBox Grid.Row="6" Grid.Column="1" Name="SetupFace" ItemsSource="{x:Static vm:SetupEditor.Faces}"
+                SelectedItem="{Binding Face}" IsVisible="{Binding IsThreeAxis}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="7" Text="Spin on the table" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
+      <ComboBox Grid.Row="7" Grid.Column="1" Name="SetupSpin" ItemsSource="{x:Static vm:SetupEditor.Spins}"
+                SelectedItem="{Binding Spin}" IsVisible="{Binding IsThreeAxis}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="8" Text="Located in the jig" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
+      <ComboBox Grid.Row="8" Grid.Column="1" Name="SetupAnchor" ItemsSource="{x:Static vm:SetupEditor.Anchors}"
+                SelectedItem="{Binding Anchor}" IsVisible="{Binding IsThreeAxis}" HorizontalAlignment="Stretch" />
+    </Grid>
+
+    <ContentControl Content="{Binding IndexAngle}" IsVisible="{Binding IsIndexed}" />
+    <ItemsControl ItemsSource="{Binding OffsetFields}" />
+    <ItemsControl Name="SetupHolding" ItemsSource="{Binding HoldingFields}" IsVisible="{Binding IsThreeAxis}" />
+  </StackPanel>
+</UserControl>
