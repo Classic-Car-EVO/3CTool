@@ -178,6 +178,64 @@ public sealed class StrategyTests(ComputeFixture fixture, ITestOutputHelper outp
         Assert.Throws<InvalidOperationException>(() => ToolpathGenerator.Generate(request));
     }
 
+    [Fact]
+    public void RotaryFinishing_NeverTakesTheTipPastTheAxis()
+    {
+        // The part sits entirely on the +Y side: from −Y the tool would have to pass the axis to reach it.
+        var stock = new Stock { Type = StockType.Cylinder, OriginX = 0, Length = 40, Diameter = 30 };
+        var part = TestMeshes.Box(new Vector3(5, 4, -3), new Vector3(35, 10, 3));
+        var request = Kit.Request(Compute, StrategyType.RotaryFinishing, Kit.Ball(6), part, stock, p => p.Stepover = 2, SetupOrientation.SimultaneousRotary);
+        var toolpath = Generate(request);
+
+        Assert.True(Kit.CutMoves(toolpath) > 0);
+        Assert.All(toolpath.Moves, m => Assert.True(m.Z >= 0, $"{m}"));
+        AssertGouge(request, toolpath, FinishingAllowance);
+    }
+
+    [Fact]
+    public void RotaryFinishing_KeepsTheTipErrorWithinTheGougeThreshold()
+    {
+        var stock = new Stock { Type = StockType.Cylinder, OriginX = 0, Length = 40, Diameter = 30 };
+        var part = TestMeshes.Box(new Vector3(5, -8, -8), new Vector3(35, 8, 8));
+        var request = Kit.Request(Compute, StrategyType.RotaryFinishing, Kit.Ball(6), part, stock, p => p.RotaryPattern = RotaryPattern.Rings, SetupOrientation.SimultaneousRotary);
+        request = With(request, new Tolerances { FinishingTolerance = 0.04, GougeThreshold = 0.04 });
+        var toolpath = Generate(request);
+
+        Assert.True(Kit.CutMoves(toolpath) > 0);
+        var gouge = Kit.MaxGouge(request, toolpath, 0);
+        output.WriteLine($"max tip error {gouge:0.0000} mm at {Kit.WorstAt}");
+        Assert.True(gouge <= 0.04, $"gouge {gouge:0.0000} at {Kit.WorstAt}");
+    }
+
+    [Fact]
+    public void RotaryFinishing_WarnsWhereTheFlutesCannotReachBelowTheRemainingStock()
+    {
+        var stock = new Stock { Type = StockType.Cylinder, OriginX = 0, Length = 40, Diameter = 60 };
+        var part = SolidMeshes.XCylinder(5, 35, 0, 0, 5, 0.01);
+        var finishing = Kit.Request(Compute, StrategyType.RotaryFinishing, Kit.Ball(4), part, stock, p => p.Stepover = 2, SetupOrientation.SimultaneousRotary);
+
+        // 12 mm flutes, tip at radius 5, raw stock to radius 30.
+        var alone = Generate(finishing);
+        Assert.Contains(alone.Warnings, w => w.StartsWith("Rotary finishing:", StringComparison.Ordinal));
+
+        var rougher = Kit.Flat(6);
+        var roughing = Generate(Kit.Request(Compute, StrategyType.RotaryRoughing, rougher, part, stock, p => p.Stepover = 2, SetupOrientation.SimultaneousRotary));
+        var after = Generate(With(finishing, finishing.Tolerances, [new PreviousCut(roughing, rougher)]));
+        Assert.DoesNotContain(after.Warnings, w => w.StartsWith("Rotary finishing:", StringComparison.Ordinal));
+    }
+
+    private static ToolpathRequest With(ToolpathRequest request, Tolerances tolerances, IReadOnlyList<PreviousCut>? previous = null) => new()
+    {
+        Compute = request.Compute,
+        Operation = request.Operation,
+        Setup = request.Setup,
+        Tool = request.Tool,
+        Stock = request.Stock,
+        Part = request.Part,
+        Tolerances = tolerances,
+        PreviousCuts = previous ?? request.PreviousCuts,
+    };
+
     private void DumpLevels(Toolpath toolpath)
     {
         output.WriteLine($"{toolpath.Strategy} levels:");

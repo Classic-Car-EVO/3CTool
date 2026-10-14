@@ -87,18 +87,21 @@ public sealed class DexelGrid
 
 /// <summary>
 /// Tri-dexel stock on the GPU: three orthogonal ray grids, each ray a sorted list of up to Capacity material
-/// segments. Material is removed by cutter sweeps and added by deposited beads. When a ray runs out of segment slots
-/// the smallest change is skipped (material kept) and <see cref="OverflowCount"/> increases.
+/// segments. Material is removed by cutter sweeps and added by deposited beads. When a removal runs out of segment
+/// slots the capacity doubles (up to <see cref="MaxCapacity"/>, memory permitting) and the sweep is repeated; past
+/// that, the smallest change is skipped (material kept) and <see cref="OverflowCount"/> increases.
 /// </summary>
 public sealed class DexelStock : IDisposable
 {
     public const int DefaultCapacity = 8;
+    public const int DefaultMaxCapacity = 64;
     private const int TileSize = 16;
     private const int MaxTileEntries = 1 << 23;
     private const int FileMagic = 0x58444333; // "3CDX"
     private const int FileVersion = 1;
 
     private readonly Grid[] _grids;
+    private readonly int[] _rayCounts;
     private readonly MemoryBuffer1D<int, Stride1D.Dense> _overflow;
 
     private DexelStock(ComputeContext compute, BoundingBox bounds, float resolution, int capacity)
@@ -122,8 +125,8 @@ public sealed class DexelStock : IDisposable
             Math.Max(1, (int)MathF.Ceiling(size.Y / resolution)),
             Math.Max(1, (int)MathF.Ceiling(size.Z / resolution)),
         };
-        var rays = ((long)counts[0] * counts[1]) + ((long)counts[1] * counts[2]) + ((long)counts[2] * counts[0]);
-        var bytes = rays * ((8L * capacity) + 4);
+        _rayCounts = counts;
+        var bytes = Bytes(capacity);
         if (bytes > compute.Device.MemoryBytes / 2)
         {
             throw new InvalidOperationException($"Dexel stock needs {bytes >> 20} MB; increase the resolution value or reduce the capacity.");
@@ -153,7 +156,11 @@ public sealed class DexelStock : IDisposable
 
     public float Resolution { get; }
 
-    public int Capacity { get; }
+    /// <summary>Segment slots per ray; grows during removal up to <see cref="MaxCapacity"/>.</summary>
+    public int Capacity { get; private set; }
+
+    /// <summary>Capacity removal may grow to before overflowing rays keep their material.</summary>
+    public int MaxCapacity { get; set; } = DefaultMaxCapacity;
 
     /// <summary>Number of ray updates that did not fit the segment capacity (material was kept).</summary>
     public long OverflowCount
@@ -265,7 +272,7 @@ public sealed class DexelStock : IDisposable
     public DexelGrid Read(DexelAxis axis)
     {
         var grid = _grids[(int)axis];
-        var segments = new float[grid.Rays * 2 * Capacity];
+        var segments = new float[grid.Rays * 2 * grid.Capacity];
         var counts = new int[grid.Rays];
         lock (Compute.Gate)
         {
@@ -273,7 +280,7 @@ public sealed class DexelStock : IDisposable
             Compute.Download(grid.Counts.View, counts);
         }
 
-        return new DexelGrid(axis, grid.CountU, grid.CountV, grid.OriginU, grid.OriginV, Resolution, Capacity, segments, counts);
+        return new DexelGrid(axis, grid.CountU, grid.CountV, grid.OriginU, grid.OriginV, Resolution, grid.Capacity, segments, counts);
     }
 
     /// <summary>Top of the material per Z ray (row-major over X, Y); NaN where the ray is empty.</summary>
@@ -284,7 +291,7 @@ public sealed class DexelStock : IDisposable
         for (var ray = 0; ray < result.Length; ray++)
         {
             var count = grid.Counts[ray];
-            result[ray] = count > 0 ? grid.Segments[(ray * 2 * Capacity) + (2 * count) - 1] : float.NaN;
+            result[ray] = count > 0 ? grid.Segments[(ray * 2 * grid.Capacity) + (2 * count) - 1] : float.NaN;
         }
 
         return result;
@@ -299,7 +306,7 @@ public sealed class DexelStock : IDisposable
         {
             for (var k = 0; k < grid.Counts[ray]; k++)
             {
-                var offset = (ray * 2 * Capacity) + (2 * k);
+                var offset = (ray * 2 * grid.Capacity) + (2 * k);
                 length += grid.Segments[offset + 1] - grid.Segments[offset];
             }
         }
@@ -316,7 +323,7 @@ public sealed class DexelStock : IDisposable
         {
             for (var k = 0; k < grid.Counts[ray]; k++)
             {
-                var offset = (ray * 2 * Capacity) + (2 * k);
+                var offset = (ray * 2 * grid.Capacity) + (2 * k);
                 result[ray] |= grid.Segments[offset] <= z && z <= grid.Segments[offset + 1];
             }
         }
@@ -374,7 +381,7 @@ public sealed class DexelStock : IDisposable
     /// <summary>Independent copy of this stock on the same device.</summary>
     public DexelStock Clone()
     {
-        var copy = new DexelStock(Compute, Bounds, Resolution, Capacity);
+        var copy = new DexelStock(Compute, Bounds, Resolution, Capacity) { MaxCapacity = MaxCapacity };
         try
         {
             copy.CopyFrom(this);
@@ -387,7 +394,10 @@ public sealed class DexelStock : IDisposable
         }
     }
 
-    /// <summary>Replaces the material with that of <paramref name="source"/>, which must have the same layout.</summary>
+    /// <summary>
+    /// Replaces the material with that of <paramref name="source"/>, which must have the same device, bounds and
+    /// resolution; this stock takes over its capacity.
+    /// </summary>
     public void CopyFrom(DexelStock source)
     {
         ArgumentNullException.ThrowIfNull(source);
@@ -396,13 +406,18 @@ public sealed class DexelStock : IDisposable
             return;
         }
 
-        if (source.Compute != Compute || source.Bounds != Bounds || source.Resolution != Resolution || source.Capacity != Capacity)
+        if (source.Compute != Compute || source.Bounds != Bounds || source.Resolution != Resolution)
         {
-            throw new ArgumentException("Stocks differ in device, bounds, resolution or capacity.", nameof(source));
+            throw new ArgumentException("Stocks differ in device, bounds or resolution.", nameof(source));
         }
 
         lock (Compute.Gate)
         {
+            if (source.Capacity != Capacity)
+            {
+                Reallocate(source.Capacity, keep: false);
+            }
+
             for (var axis = 0; axis < 3; axis++)
             {
                 Compute.Copy(source._grids[axis].Segments.View, _grids[axis].Segments.View);
@@ -441,7 +456,7 @@ public sealed class DexelStock : IDisposable
                 writer.Write7BitEncodedInt(count);
                 for (var k = 0; k < 2 * count; k++)
                 {
-                    writer.Write(grid.Segments[(ray * 2 * Capacity) + k]);
+                    writer.Write(grid.Segments[(ray * 2 * grid.Capacity) + k]);
                 }
             }
         }
@@ -578,30 +593,51 @@ public sealed class DexelStock : IDisposable
             using var removedBuffer = Compute.Accelerator.Allocate1D<long>(totals.Length);
             removedBuffer.MemSetToZero();
             var kernel = Compute.Kernel<DexelSweepArgs>(DexelKernel.Sweep);
-            foreach (var grid in _grids)
+            var overflow = new int[1];
+            while (true)
             {
-                foreach (var (tileStart, tileMoves) in grid.Bin(boxes))
+                Compute.Download(_overflow.View, overflow);
+                var before = overflow[0];
+                foreach (var grid in _grids)
                 {
-                    using var startBuffer = Compute.Accelerator.Allocate1D(tileStart);
-                    using var movesBuffer = Compute.Accelerator.Allocate1D(tileMoves);
-                    kernel(grid.Rays, new DexelSweepArgs
+                    foreach (var (tileStart, tileMoves) in grid.Bin(boxes))
                     {
-                        Grid = grid.View,
-                        Cutter = cutter,
-                        Moves = moveBuffer.View,
-                        TileStart = startBuffer.View,
-                        TileMoves = movesBuffer.View,
-                        TileSize = TileSize,
-                        TilesU = grid.TilesU,
-                        Add = add ? 1 : 0,
-                        ForceGeneral = ForceGeneralSolver ? 1 : 0,
-                        MinLength = Resolution * 1e-3f,
-                        Overflow = _overflow.View,
-                        Removed = removedBuffer.View,
-                        MeasureScale = measure && grid.Axis == (int)DexelAxis.Z ? scale : 0,
-                    });
-                    Compute.Accelerator.Synchronize();
+                        using var startBuffer = Compute.Accelerator.Allocate1D(tileStart);
+                        using var movesBuffer = Compute.Accelerator.Allocate1D(tileMoves);
+                        kernel(grid.Rays, new DexelSweepArgs
+                        {
+                            Grid = grid.View,
+                            Cutter = cutter,
+                            Moves = moveBuffer.View,
+                            TileStart = startBuffer.View,
+                            TileMoves = movesBuffer.View,
+                            TileSize = TileSize,
+                            TilesU = grid.TilesU,
+                            Add = add ? 1 : 0,
+                            ForceGeneral = ForceGeneralSolver ? 1 : 0,
+                            MinLength = Resolution * 1e-3f,
+                            Overflow = _overflow.View,
+                            Removed = removedBuffer.View,
+                            MeasureScale = measure && grid.Axis == (int)DexelAxis.Z ? scale : 0,
+                        });
+                        Compute.Accelerator.Synchronize();
+                    }
                 }
+
+                // Removal skips what does not fit and is idempotent: with more slots, sweeping again completes it
+                // (the measured volumes only count material still present). Deposits close gaps instead; no retry.
+                if (add || Capacity >= MaxCapacity)
+                {
+                    break;
+                }
+
+                Compute.Download(_overflow.View, overflow);
+                if (overflow[0] == before || !TryGrow())
+                {
+                    break;
+                }
+
+                Compute.Upload(_overflow.View, [before]);
             }
 
             if (measure)
@@ -618,6 +654,60 @@ public sealed class DexelStock : IDisposable
                 removed[owners[i]] += totals[i] * area;
             }
         }
+    }
+
+    private long Bytes(int capacity) =>
+        (((long)_rayCounts[0] * _rayCounts[1]) + ((long)_rayCounts[1] * _rayCounts[2]) + ((long)_rayCounts[2] * _rayCounts[0])) * ((8L * capacity) + 4);
+
+    /// <summary>Doubles the capacity (at most <see cref="MaxCapacity"/>) keeping the material; false when it does not fit the device.</summary>
+    private bool TryGrow()
+    {
+        var capacity = Math.Min(2 * Capacity, MaxCapacity);
+        if (capacity <= Capacity || Bytes(Capacity) + Bytes(capacity) > Compute.Device.MemoryBytes / 2)
+        {
+            return false;
+        }
+
+        Reallocate(capacity, keep: true);
+        return true;
+    }
+
+    /// <summary>Replaces the grids by ones with <paramref name="capacity"/> slots per ray, optionally copying the segments over. Caller holds the gate.</summary>
+    private void Reallocate(int capacity, bool keep)
+    {
+        for (var axis = 0; axis < 3; axis++)
+        {
+            var old = _grids[axis];
+            var grid = new Grid(Compute, axis, Bounds, Resolution, capacity, _rayCounts);
+            try
+            {
+                if (keep)
+                {
+                    var counts = new int[old.Rays];
+                    var from = new float[old.Rays * 2 * old.Capacity];
+                    Compute.Download(old.Counts.View, counts);
+                    Compute.Download(old.Segments.View, from);
+                    var to = new float[grid.Rays * 2 * capacity];
+                    for (var ray = 0; ray < counts.Length; ray++)
+                    {
+                        Array.Copy(from, ray * 2 * old.Capacity, to, ray * 2 * capacity, 2 * Math.Min(counts[ray], capacity));
+                    }
+
+                    Compute.Upload(grid.Segments.View, to);
+                    Compute.Upload(grid.Counts.View, counts);
+                }
+            }
+            catch
+            {
+                grid.Dispose();
+                throw;
+            }
+
+            _grids[axis] = grid;
+            old.Dispose();
+        }
+
+        Capacity = capacity;
     }
 
     private sealed class Grid : IDisposable

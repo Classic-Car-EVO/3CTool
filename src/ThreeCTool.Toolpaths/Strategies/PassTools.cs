@@ -115,7 +115,11 @@ internal static class PassTools
         return result.OrderBy(r => r.Item1).ThenBy(r => (r.Item2[0].x * cos) + (r.Item2[0].y * sin)).ToList();
     }
 
-    /// <summary>Douglas–Peucker simplification of a 3D polyline.</summary>
+    /// <summary>
+    /// Douglas–Peucker simplification of a 3D polyline. A point is dropped only if both its distance to the chord and
+    /// its height (Z) above or below the chord at the same XY stay within <paramref name="tolerance"/>: on steep
+    /// slopes the perpendicular distance alone understates the tip height error of drop-cutter paths.
+    /// </summary>
     public static List<P3> Simplify(List<P3> points, double tolerance)
     {
         if (points.Count <= 2)
@@ -134,7 +138,7 @@ internal static class PassTools
             var worstDistance = tolerance;
             for (var i = a + 1; i < b; i++)
             {
-                var d = SegmentDistance(points[i], points[a], points[b]);
+                var d = Math.Max(SegmentDistance(points[i], points[a], points[b]), HeightDeviation(points[i], points[a], points[b]));
                 if (d > worstDistance)
                 {
                     (worst, worstDistance) = (i, d);
@@ -158,6 +162,20 @@ internal static class PassTools
         var length2 = (ab.X * ab.X) + (ab.Y * ab.Y) + (ab.Z * ab.Z);
         var t = length2 < 1e-18 ? 0 : Math.Clamp((((p.X - a.X) * ab.X) + ((p.Y - a.Y) * ab.Y) + ((p.Z - a.Z) * ab.Z)) / length2, 0, 1);
         return P3.Distance(p, a + (ab * t));
+    }
+
+    /// <summary>|Z| difference between <paramref name="p"/> and chord a–b at p's XY projection onto it (0 for vertical chords).</summary>
+    public static double HeightDeviation(P3 p, P3 a, P3 b)
+    {
+        var (dx, dy) = (b.X - a.X, b.Y - a.Y);
+        var length2 = (dx * dx) + (dy * dy);
+        if (length2 < 1e-18)
+        {
+            return 0;
+        }
+
+        var t = Math.Clamp((((p.X - a.X) * dx) + ((p.Y - a.Y) * dy)) / length2, 0, 1);
+        return Math.Abs(p.Z - (a.Z + ((b.Z - a.Z) * t)));
     }
 
     /// <summary>Points every <paramref name="step"/> (at most) along a polyline, keeping its vertices.</summary>

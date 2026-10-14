@@ -251,13 +251,42 @@ public class DexelStockTests(CpuComputeFixture fixture) : IClassFixture<CpuCompu
     public void OverflowKeepsMaterial()
     {
         using var stock = DexelStock.Box(_compute, Block(40, 10, 10), 0.5f, capacity: 2);
+        stock.MaxCapacity = 2;
         ToolMove[] plunges = [.. Enumerable.Range(0, 5).Select(i => new ToolMove(new Vector3(5 + (7 * i), 5, 2), new Vector3(5 + (7 * i), 5, 2)))];
         stock.Remove(CutterProfile.Flat(3, 20), plunges);
         Assert.True(stock.OverflowCount > 0);
+        Assert.Equal(2, stock.Capacity);
         var x = stock.Read(DexelAxis.X);
         var ray = x.Ray(10, 10).ToArray(); // y = 5.25, z = 5.25
         Assert.Equal(4, ray.Length);
         Assert.True(ray[0] == 0 && ray[^1] == 40);
+    }
+
+    [Fact]
+    public void OverflowGrowsCapacityAndCompletesRemoval()
+    {
+        using var stock = DexelStock.Box(_compute, Block(40, 10, 10), 0.5f, capacity: 2);
+        var before = stock.Volume();
+        ToolMove[] plunges = [.. Enumerable.Range(0, 5).Select(i => new ToolMove(new Vector3(5 + (7 * i), 5, 2), new Vector3(5 + (7 * i), 5, 2)))];
+        var removed = new double[plunges.Length];
+        stock.Remove(CutterProfile.Flat(3, 20), plunges, removed);
+        Assert.Equal(0, stock.OverflowCount);
+        Assert.Equal(8, stock.Capacity);
+        var ray = stock.Read(DexelAxis.X).Ray(10, 10).ToArray(); // y = 5.25, z = 5.25: five holes, six pieces
+        Assert.Equal(12, ray.Length);
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.InRange(ray[(2 * i) + 1], 5 + (7 * i) - 1.6f, 5 + (7 * i) - 1.3f);
+        }
+
+        Assert.Equal(before - stock.Volume(), removed.Sum(), 1e-3 * before);
+
+        using var copy = stock.Clone();
+        Assert.Equal(8, copy.Capacity);
+        using var small = DexelStock.Box(_compute, Block(40, 10, 10), 0.5f, capacity: 2);
+        small.CopyFrom(stock);
+        Assert.Equal(8, small.Capacity);
+        DexelAssert.GridsClose(stock.Read(DexelAxis.X), small.Read(DexelAxis.X), 0);
     }
 
     [Fact]
@@ -366,6 +395,7 @@ public class DexelStockTests(CpuComputeFixture fixture) : IClassFixture<CpuCompu
     public void SaveLoad_RoundTripsSegmentsAndOverflow()
     {
         using var stock = DexelStock.Box(_compute, Block(30, 20, 10), 0.5f, capacity: 2);
+        stock.MaxCapacity = 2;
         stock.Remove(CutterProfile.Ball(4, 20), [new ToolMove(new Vector3(2, 10, 6), new Vector3(28, 10, 6))]);
         stock.Remove(CutterProfile.Flat(3, 20), [new ToolMove(new Vector3(15, 2, 3), new Vector3(15, 18, 3))]);
         using var buffer = new MemoryStream();
