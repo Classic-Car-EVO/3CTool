@@ -723,6 +723,20 @@ namespace ThreeCTool.Data.Migrations.Project
                         .ValueGeneratedOnAdd()
                         .HasColumnType("TEXT");
 
+                    b.Property<string>("Anchor")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double?>("DepthLimit")
+                        .HasColumnType("REAL");
+
+                    b.Property<string>("Face")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("FrameWidth")
+                        .HasColumnType("REAL");
+
                     b.Property<double>("IndexAngle")
                         .HasColumnType("REAL");
 
@@ -743,6 +757,18 @@ namespace ThreeCTool.Data.Migrations.Project
 
                     b.Property<string>("RotaryCenterName")
                         .HasColumnType("TEXT");
+
+                    b.Property<int?>("Spin")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<int>("TabCount")
+                        .HasColumnType("INTEGER");
+
+                    b.Property<double>("TabThickness")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("TabWidth")
+                        .HasColumnType("REAL");
 
                     b.Property<double>("WcsOffsetX")
                         .HasColumnType("REAL");

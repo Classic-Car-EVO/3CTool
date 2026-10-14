@@ -4,7 +4,7 @@
              x:Class="ThreeCTool.Desktop.Views.SetupEditorView"
              x:DataType="vm:SetupEditor">
   <StackPanel Spacing="4">
-    <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
+    <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto" RowSpacing="4">
       <TextBlock Text="Name" VerticalAlignment="Center" />
       <TextBox Grid.Column="1" Name="SetupName" Text="{Binding Name}" />
 
@@ -28,9 +28,22 @@
       <TextBlock Grid.Row="5" Text="Probing" VerticalAlignment="Center" />
       <ComboBox Grid.Row="5" Grid.Column="1" Name="SetupProbe" ItemsSource="{x:Static vm:SetupEditor.ProbeMethods}"
                 SelectedItem="{Binding Probe}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="6" Text="Stock face up" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
+      <ComboBox Grid.Row="6" Grid.Column="1" Name="SetupFace" ItemsSource="{x:Static vm:SetupEditor.Faces}"
+                SelectedItem="{Binding Face}" IsVisible="{Binding IsThreeAxis}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="7" Text="Spin on the table" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
+      <ComboBox Grid.Row="7" Grid.Column="1" Name="SetupSpin" ItemsSource="{x:Static vm:SetupEditor.Spins}"
+                SelectedItem="{Binding Spin}" IsVisible="{Binding IsThreeAxis}" HorizontalAlignment="Stretch" />
+
+      <TextBlock Grid.Row="8" Text="Located in the jig" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
+      <ComboBox Grid.Row="8" Grid.Column="1" Name="SetupAnchor" ItemsSource="{x:Static vm:SetupEditor.Anchors}"
+                SelectedItem="{Binding Anchor}" IsVisible="{Binding IsThreeAxis}" HorizontalAlignment="Stretch" />
     </Grid>
 
     <ContentControl Content="{Binding IndexAngle}" IsVisible="{Binding IsIndexed}" />
     <ItemsControl ItemsSource="{Binding OffsetFields}" />
+    <ItemsControl Name="SetupHolding" ItemsSource="{Binding HoldingFields}" IsVisible="{Binding IsThreeAxis}" />
   </StackPanel>
 </UserControl>

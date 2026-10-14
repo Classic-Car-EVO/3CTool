@@ -157,7 +157,19 @@ public sealed class DatabaseTests : IDisposable
     [Fact]
     public async Task Project_SetupWithOperations_RoundTripsAndCascades()
     {
-        var setup = new Setup { Name = "Top", WorkOffset = WorkOffset.G55 };
+        var setup = new Setup
+        {
+            Name = "Top",
+            WorkOffset = WorkOffset.G55,
+            Face = StockFace.Left,
+            Spin = 270,
+            Anchor = TurnAnchor.FrontLeft,
+            DepthLimit = 12.5,
+            TabCount = 3,
+            TabWidth = 5,
+            TabThickness = 1.5,
+            FrameWidth = 8,
+        };
         setup.Operations.Add(new Operation
         {
             SetupId = setup.Id,
@@ -181,6 +193,11 @@ public sealed class DatabaseTests : IDisposable
 
             var loaded = await db.Setups.Include(s => s.Operations).SingleAsync();
             Assert.Equal(WorkOffset.G55, loaded.WorkOffset);
+            Assert.Equal(StockFace.Left, loaded.Face);
+            Assert.Equal(270, loaded.Spin);
+            Assert.Equal(TurnAnchor.FrontLeft, loaded.Anchor);
+            Assert.Equal(12.5, loaded.DepthLimit);
+            Assert.Equal((3, 5.0, 1.5, 8.0), (loaded.TabCount, loaded.TabWidth, loaded.TabThickness, loaded.FrameWidth));
             var operation = Assert.Single(loaded.Operations);
             Assert.Equal(2.5, operation.Parameters.Stepover);
             Assert.Equal(EntryMode.Ramp, operation.Parameters.Entry);

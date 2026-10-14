@@ -51,7 +51,7 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         var tool = request.Tool;
         writer.Comment("3C Tool milling program");
         writer.Comment($"Project: {request.Project.Name}");
-        writer.Comment($"Setup {setup.Order}: {setup.Name}, {setup.WorkOffset}, {SetupText(setup)}");
+        writer.Comment($"Setup {setup.Order}: {setup.Name}, {setup.WorkOffset}, {SetupText(setup, rotary)}");
         if (request.Piece is { } piece)
         {
             writer.Comment($"Piece {piece.Number} of {request.PieceCount}: {PieceText(piece)}");
@@ -84,6 +84,14 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         if (request.Piece is { } mount && request.FirstInSetup)
         {
             writer.Comment($"Mount piece {mount.Number} of {request.PieceCount} for setup {setup.Order}: {PieceText(mount)}");
+            writer.Line("M0");
+        }
+
+        // Stock turn: the jig puts the turned stock back at the same machine position.
+        if (rotary.IsTurned && request.FirstInSetup)
+        {
+            var anchor = setup.Anchor == TurnAnchor.FrontLeft ? "against the front-left stops" : "centred on the dowel pins";
+            writer.Comment($"Turn the stock for setup {setup.Order}: {StockTurn.Instruction(rotary.Face, rotary.Spin)}; locate it in the jig {anchor}, the work offset stays");
             writer.Line("M0");
         }
 
@@ -217,10 +225,11 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
     /// <summary>Z of <see cref="ReferenceOffset"/>.</summary>
     private const int ReferenceZParameter = 5221 + (20 * (int)ReferenceOffset) + 2;
 
-    private static string SetupText(Setup setup) => setup.Orientation switch
+    private static string SetupText(Setup setup, SetupFrame frame) => setup.Orientation switch
     {
         SetupOrientation.Indexed => $"indexed A{Writer.Format(setup.IndexAngle)}",
         SetupOrientation.SimultaneousRotary => "simultaneous rotary",
+        _ when frame.IsTurned => $"3-axis, {StockTurn.FaceName(frame.Face)} face up, spin {frame.Spin} deg",
         _ => "3-axis",
     };
 

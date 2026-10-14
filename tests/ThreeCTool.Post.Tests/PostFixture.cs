@@ -84,7 +84,7 @@ internal static class PostFixture
         {
             OperationId = operation.Id,
             ToolId = tool.Id,
-            Frame = new SetupFrame(setup.Orientation, 0, 0, 0, setup.IndexAngle),
+            Frame = new SetupFrame(setup.Orientation, 0, 0, 0, setup.IndexAngle, setup.Face, setup.Spin ?? 0),
             Clearance = 5,
             Moves = [.. moves],
         };

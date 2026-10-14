@@ -202,6 +202,45 @@ public sealed class CamPipelineTests(CamProjectFixture project)
     }
 
     [Fact]
+    public async Task TwoSided_MachinesEachHalfFromItsOwnFace()
+    {
+        var (session, rough, _) = await project.CreateProjectAsync("twosided");
+        await using var _ = session;
+        var under = await session.AddSetupAsync(SetupOrientation.ThreeAxis);
+        under.Name = "Under";
+        under.Face = StockFace.Bottom;
+        var flip = await session.AddOperationAsync(under, StrategyType.ZLevelRoughing, rough.ToolId);
+        await session.SaveAsync();
+
+        // Stock z −2..8: each side stops at the mid-plane z 3.
+        using var pipeline = new CamPipeline(session, project.Compute);
+        Assert.Empty(pipeline.TilingProblems());
+        var outputs = await pipeline.RunAllAsync();
+        var top = pipeline.GetToolpath(rough.Id)!.Toolpath;
+        var bottom = pipeline.GetToolpath(flip.Id)!.Toolpath;
+        Assert.Equal(StockFace.Bottom, bottom.Frame.Face);
+        var topTips = top.Moves.Where(m => m.Kind == Toolpaths.MoveKind.Cut).Select(m => top.Frame.ToolInPart(m).Tip).ToList();
+        var bottomTips = bottom.Moves.Where(m => m.Kind == Toolpaths.MoveKind.Cut).Select(m => bottom.Frame.ToolInPart(m).Tip).ToList();
+        Assert.NotEmpty(bottomTips);
+        Assert.All(topTips, t => Assert.True(t.Z >= 3 - 1e-6, $"top cut at part Z {t.Z}"));
+        Assert.All(bottomTips, t => Assert.True(t.Z <= 3 + 1e-6, $"bottom cut at part Z {t.Z}"));
+        Assert.True(bottomTips.Min(t => t.Z) < 0, "the bottom side clears the stock below the part");
+
+        var file = outputs.Single(o => o.Lines.Any(l => l.StartsWith("(Setup 2: Under", StringComparison.Ordinal)));
+        Assert.Contains(file.Lines, l => l.StartsWith("(Turn the stock for setup 2: bottom face up", StringComparison.Ordinal));
+
+        // Hashes follow the other faces: turning the second setup back to the top lifts the first one's limit.
+        var hash = pipeline.InputHash(rough);
+        under.Face = StockFace.Top;
+        Assert.NotEqual(hash, pipeline.InputHash(rough));
+        under.Face = StockFace.Bottom;
+
+        var bounds = (await session.MillPartAsync()).Bounds;
+        StockTiling.Fit(session.Stock, "Board", 14, 20, 5, (bounds.Min.X, bounds.Min.Y, bounds.Min.Z, bounds.Max.X, bounds.Max.Y, bounds.Max.Z), 2);
+        Assert.Contains(pipeline.TilingProblems(), p => p.Contains("only machined from the top", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task DirectFeeder_UploadsPostedFilesWithLearningTags()
     {
         var session = project.Session;

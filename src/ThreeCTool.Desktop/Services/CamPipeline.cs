@@ -105,18 +105,24 @@ public sealed class CamPipeline : IDisposable
         toolpaths.TryGetValue((operationId, piece), out var generated) && generated.InputHash == InputHash(generated.Operation, piece) ? generated : null;
 
     /// <summary>
-    /// Why the project cannot be machined with its stock pieces (invalid seams, setups that are not 3-axis), or empty.
+    /// Why the project cannot be machined with its stock pieces (invalid seams, setups that are not 3-axis, turned
+    /// stock or tabs on a split stock) or its stock turns (<see cref="StockTurn.Problems"/>), or empty.
     /// </summary>
     public IReadOnlyList<string> TilingProblems()
     {
         var problems = StockTiling.Problems(session.Stock).ToList();
+        var active = session.Setups.Where(s => s.Operations.Any(o => o.Enabled)).ToList();
         if (IsTiled)
         {
-            problems.AddRange(session.Setups
-                .Where(s => s.Orientation != SetupOrientation.ThreeAxis && s.Operations.Any(o => o.Enabled))
+            problems.AddRange(active
+                .Where(s => s.Orientation != SetupOrientation.ThreeAxis)
                 .Select(s => $"Setup '{s.Name}' is not 3-axis; a stock split into pieces can only be machined with 3-axis setups."));
+            problems.AddRange(active
+                .Where(s => StockTurn.IsTurned(s) || (s.Orientation == SetupOrientation.ThreeAxis && s.TabCount > 0))
+                .Select(s => $"Setup '{s.Name}' turns the stock or has tabs; a stock split into pieces is only machined from the top."));
         }
 
+        problems.AddRange(StockTurn.Problems(session.Stock, session.Setups));
         return problems;
     }
 
@@ -197,6 +203,7 @@ public sealed class CamPipeline : IDisposable
         {
             var stock = PieceStock(piece);
             var stockMesh = piece.Number == 0 ? session.LoadStockMesh() : null;
+            var layouts = new Dictionary<Guid, TabLayout?>();
             var previous = new List<PreviousCut>();
             var hashes = new List<string>();
             for (var i = 0; i < order.Count; i++)
@@ -211,11 +218,13 @@ public sealed class CamPipeline : IDisposable
                 var generated = await LoadCachedAsync(operation, piece.Number, hash, cancellationToken).ConfigureAwait(true);
                 if (generated is null)
                 {
+                    var setup = SetupCopy(operation.SetupId);
+                    var side = await Task.Run(() => SideOf(setup, stock, piecePart, layouts), cancellationToken).ConfigureAwait(true);
                     var request = new ToolpathRequest
                     {
                         Compute = lease.Context,
                         Operation = EntityCopy.Clone(operation),
-                        Setup = SetupCopy(operation.SetupId),
+                        Setup = setup,
                         Tool = tool,
                         Collet = session.ColletFor(tool),
                         Stock = stock,
@@ -225,6 +234,9 @@ public sealed class CamPipeline : IDisposable
                         Tolerances = tolerances,
                         Machine = machine,
                         PreviousCuts = [.. previous],
+                        DepthLimit = side.Depth,
+                        Tabs = side.Tabs,
+                        SetupWarnings = side.Warnings,
                     };
                     var inner = progress is null ? null : new Progress<double>(f => progress.Report(new CamProgress("Toolpaths", item, (done + f) / total)));
                     var toolpath = await Task.Run(() => ToolpathGenerator.Generate(request, inner, cancellationToken), cancellationToken).ConfigureAwait(true);
@@ -619,6 +631,58 @@ public sealed class CamPipeline : IDisposable
         return copy;
     }
 
+    /// <summary>
+    /// Depth limit of a 3-axis setup, the tabs and frame it must leave standing (those of every tab setup on the same
+    /// axis, created once per piece in <paramref name="layouts"/>) and the notes on its own tabs.
+    /// </summary>
+    private (double? Depth, Mesh? Tabs, IReadOnlyList<string> Warnings) SideOf(Setup setup, Stock stock, Mesh part, Dictionary<Guid, TabLayout?> layouts)
+    {
+        if (setup.Orientation != SetupOrientation.ThreeAxis)
+        {
+            return (null, null, []);
+        }
+
+        var meshes = new List<Mesh>();
+        var warnings = new List<string>();
+        var tabSetups = session.Setups.Where(s =>
+            s.Orientation == SetupOrientation.ThreeAxis && s.TabCount > 0 && s.Operations.Any(o => o.Enabled) && StockTurn.SameAxis(s.Face, setup.Face));
+        foreach (var other in tabSetups)
+        {
+            if (!layouts.TryGetValue(other.Id, out var layout))
+            {
+                layout = StockTurn.DepthLimit(other, session.Setups, stock) is { } depth ? TabSolids.Create(other, depth, stock, part) : null;
+                layouts[other.Id] = layout;
+            }
+
+            if (layout is not null)
+            {
+                meshes.Add(layout.Mesh);
+                if (other.Id == setup.Id)
+                {
+                    warnings.AddRange(layout.Warnings);
+                }
+            }
+        }
+
+        return (StockTurn.DepthLimit(setup, session.Setups, stock), meshes.Count == 0 ? null : Mesh.Merge(meshes, "tabs"), warnings);
+    }
+
+    /// <summary>What the depth limits and tabs of the 3-axis setups depend on: the faces, holding and active state of every setup.</summary>
+    private string SidesKey() => Sha(EntityCopy.Canonical(session.Setups.Select(s => new
+    {
+        s.Id,
+        s.Orientation,
+        s.Face,
+        s.Spin,
+        s.Anchor,
+        s.DepthLimit,
+        s.TabCount,
+        s.TabWidth,
+        s.TabThickness,
+        s.FrameWidth,
+        Active = s.Operations.Any(o => o.Enabled),
+    })));
+
     private string Hash(Operation operation, IReadOnlyList<string> previous, StockPiece piece)
     {
         var tool = session.FindTool(operation.ToolId);
@@ -633,6 +697,7 @@ public sealed class CamPipeline : IDisposable
                 ? (object)session.Stock
                 : new { piece.MinX, piece.MinY, piece.MinZ, piece.SizeX, piece.SizeY, piece.SizeZ, Clip = ClipPlanes(piece) },
             Parts = PartsKey(),
+            Sides = SidesKey(),
             session.KeepOuts,
             session.Project.Tolerances,
             session.Machine,

@@ -51,7 +51,14 @@ public readonly record struct TouchPlateSpot(double X, double Y, double SurfaceZ
         var x = (0.5 * (min.X + max.X)) - frame.OriginX;
         if (!frame.IsRotary)
         {
-            return new(x, (0.5 * (min.Y + max.Y)) - frame.OriginY, max.Z - frame.OriginZ);
+            // A turned stock shows another face on top: take the WCS box of the turned stock.
+            var corners = Enumerable.Range(0, 8)
+                .Select(i => frame.PartToWcs(new P3((i & 1) == 0 ? min.X : max.X, (i & 2) == 0 ? min.Y : max.Y, (i & 4) == 0 ? min.Z : max.Z), 0))
+                .ToList();
+            return new(
+                0.5 * (corners.Min(c => c.X) + corners.Max(c => c.X)),
+                0.5 * (corners.Min(c => c.Y) + corners.Max(c => c.Y)),
+                corners.Max(c => c.Z));
         }
 
         if (stockRadius is { } radius)

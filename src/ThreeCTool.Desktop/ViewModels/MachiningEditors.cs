@@ -35,6 +35,7 @@ public sealed partial class SetupRow : ObservableObject
         {
             SetupOrientation.Indexed => $"indexed A{Setup.IndexAngle.ToString("0.###", CultureInfo.InvariantCulture)}",
             SetupOrientation.SimultaneousRotary => "simultaneous rotary",
+            _ when Setup.Face != StockFace.Top => $"3-axis, {StockTurn.FaceName(Setup.Face)} face up",
             _ => "3-axis",
         };
         var count = Setup.Operations.Count;
@@ -82,7 +83,10 @@ public sealed partial class OperationRow : ObservableObject
     }
 }
 
-/// <summary>Editor of a setup: orientation, work coordinates and probing. Every valid change is saved.</summary>
+/// <summary>
+/// Editor of a setup: orientation, the stock face up and its holding (3-axis), work coordinates and probing. Every
+/// valid change is saved.
+/// </summary>
 public sealed partial class SetupEditor : ObservableObject
 {
     private readonly Func<Task> save;
@@ -102,6 +106,9 @@ public sealed partial class SetupEditor : ObservableObject
         WorkOffset = setup.WorkOffset;
         Reference = References.First(r => r.Value == setup.WcsReference);
         Probe = ProbeMethods.First(p => p.Value == setup.ProbeMethod);
+        Face = Faces.First(f => f.Value == setup.Face);
+        Spin = Spins.FirstOrDefault(s => s.Value == setup.Spin) ?? Spins[0];
+        Anchor = Anchors.First(a => a.Value == setup.Anchor);
         IndexAngle = Watch(NumberField.Number("Index angle (A, degrees)", () => setup.IndexAngle, v => setup.IndexAngle = v));
         OffsetFields =
         [
@@ -109,8 +116,33 @@ public sealed partial class SetupEditor : ObservableObject
             Watch(NumberField.Length("WCS offset Y", () => setup.WcsOffsetY, v => setup.WcsOffsetY = v, unit)),
             Watch(NumberField.Length("WCS offset Z", () => setup.WcsOffsetZ, v => setup.WcsOffsetZ = v, unit)),
         ];
+        var depth = NumberField.OptionalLength("Depth limit (below the stock top)", () => setup.DepthLimit, v => setup.DepthLimit = v, unit);
+        depth.Hint = "Automatic: half the stock when the opposite face is machined too";
+        HoldingFields =
+        [
+            Watch(depth),
+            Watch(NumberField.WholeNumber("Tabs at the depth limit", () => setup.TabCount, v => setup.TabCount = v)),
+            Watch(NumberField.PositiveLength("Tab width", () => setup.TabWidth, v => setup.TabWidth = v, unit)),
+            Watch(NumberField.PositiveLength("Tab thickness", () => setup.TabThickness, v => setup.TabThickness = v, unit)),
+            Watch(NumberField.PositiveLength("Frame width (kept round the stock with tabs)", () => setup.FrameWidth, v => setup.FrameWidth = v, unit)),
+        ];
         loading = false;
     }
+
+    public static IReadOnlyList<Choice<StockFace>> Faces { get; } =
+        [.. StockTurn.Faces.Select(f => new Choice<StockFace>(f == StockFace.Top ? "Top (stock as placed)" : $"{char.ToUpperInvariant(StockTurn.FaceName(f)[0])}{StockTurn.FaceName(f)[1..]}", f))];
+
+    public static IReadOnlyList<Choice<int?>> Spins { get; } =
+    [
+        new("Automatic (longest edge along X)", null),
+        .. StockTurn.Spins.Select(s => new Choice<int?>($"{s} degrees", s)),
+    ];
+
+    public static IReadOnlyList<Choice<TurnAnchor>> Anchors { get; } =
+    [
+        new("Centred on the jig (dowel pins)", TurnAnchor.Center),
+        new("Front-left corner against the stops", TurnAnchor.FrontLeft),
+    ];
 
     public static IReadOnlyList<Choice<SetupOrientation>> Orientations { get; } =
     [
@@ -145,12 +177,27 @@ public sealed partial class SetupEditor : ObservableObject
     public partial string Name { get; set; }
 
     [ObservableProperty]
-    [NotifyPropertyChangedFor(nameof(IsRotary), nameof(IsIndexed))]
+    [NotifyPropertyChangedFor(nameof(IsRotary), nameof(IsIndexed), nameof(IsThreeAxis))]
     public partial Choice<SetupOrientation> Orientation { get; set; }
 
     public bool IsRotary => Orientation.Value != SetupOrientation.ThreeAxis;
 
+    public bool IsThreeAxis => !IsRotary;
+
     public bool IsIndexed => Orientation.Value == SetupOrientation.Indexed;
+
+    /// <summary>Stock face up (3-axis): the operator turns the stock in the jig.</summary>
+    [ObservableProperty]
+    public partial Choice<StockFace> Face { get; set; }
+
+    [ObservableProperty]
+    public partial Choice<int?> Spin { get; set; }
+
+    [ObservableProperty]
+    public partial Choice<TurnAnchor> Anchor { get; set; }
+
+    /// <summary>Depth limit, tabs and frame (3-axis).</summary>
+    public IReadOnlyList<NumberField> HoldingFields { get; }
 
     [ObservableProperty]
     public partial string? RotaryCenter { get; set; }
@@ -237,6 +284,33 @@ public sealed partial class SetupEditor : ObservableObject
         if (!loading && value is not null && value.Value != Setup.ProbeMethod)
         {
             Setup.ProbeMethod = value.Value;
+            _ = save();
+        }
+    }
+
+    partial void OnFaceChanged(Choice<StockFace> value)
+    {
+        if (!loading && value is not null && value.Value != Setup.Face)
+        {
+            Setup.Face = value.Value;
+            _ = save();
+        }
+    }
+
+    partial void OnSpinChanged(Choice<int?> value)
+    {
+        if (!loading && value is not null && value.Value != Setup.Spin)
+        {
+            Setup.Spin = value.Value;
+            _ = save();
+        }
+    }
+
+    partial void OnAnchorChanged(Choice<TurnAnchor> value)
+    {
+        if (!loading && value is not null && value.Value != Setup.Anchor)
+        {
+            Setup.Anchor = value.Value;
             _ = save();
         }
     }

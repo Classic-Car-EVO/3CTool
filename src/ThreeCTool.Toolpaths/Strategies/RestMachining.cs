@@ -157,7 +157,7 @@ internal static class RestMachining
     {
         var (tip, axis) = source.ToolInPart(move);
         var w = target.PartToWcs(tip, target.BaseAngle);
-        var a = target.IsRotary ? SetupFrame.RotateX(axis, target.BaseAngle) : axis;
+        var a = target.DirectionToWcs(axis, target.BaseAngle);
         return (new Vector3((float)w.X, (float)w.Y, (float)w.Z), Vector3.Normalize(new Vector3((float)a.X, (float)a.Y, (float)a.Z)));
     }
 }

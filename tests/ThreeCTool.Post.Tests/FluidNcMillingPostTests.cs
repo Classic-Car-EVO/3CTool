@@ -439,6 +439,40 @@ public sealed class FluidNcMillingPostTests
     }
 
     [Fact]
+    public void Post_TurnedStock_StopsToTurnItBeforeTheFirstTool()
+    {
+        var setup = PostFixture.Setup();
+        setup.Face = StockFace.Bottom;
+        setup.Spin = 0;
+        var first = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup)).Lines.ToList();
+        var later = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup, first: false)).Lines;
+
+        Assert.Contains("(Setup 1: Top, G54, 3-axis, bottom face up, spin 0 deg)", first);
+        var turn = first.FindIndex(l => l.StartsWith("(Turn the stock", StringComparison.Ordinal));
+        Assert.Equal(
+            "(Turn the stock for setup 1: bottom face up, original front face towards +Y back, original right face towards +X right; locate it in the jig centred on the dowel pins, the work offset stays)",
+            first[turn]);
+        Assert.Equal("M0", first[turn + 1]);
+        Assert.StartsWith("(Insert tool", first[turn + 2], StringComparison.Ordinal);
+        Assert.DoesNotContain(later, l => l.StartsWith("(Turn the stock", StringComparison.Ordinal));
+
+        var top = post.Post(PostFixture.Request(PostFixture.SimpleMoves())).Lines;
+        Assert.DoesNotContain(top, l => l.StartsWith("(Turn the stock", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public void FromStockBounds_TurnedStock_IsTheTopCentreOfTheTurnedStock()
+    {
+        // 100 x 60 x 20 stock on its front face (60 tall), zero kept at the original top centre.
+        var frame = new SetupFrame(SetupOrientation.ThreeAxis, 50, 10, -40, 0, StockFace.Front);
+        var spot = TouchPlateSpot.FromStockBounds(frame, new Geometry.BoundingBox(new Vector3(0, 0, 0), new Vector3(100, 60, 20)));
+
+        Assert.Equal(0, spot.X, 9);
+        Assert.Equal(0, spot.Y, 9);
+        Assert.Equal(40, spot.SurfaceZ, 9);
+    }
+
+    [Fact]
     public void FromStockBounds_ThreeAxis_IsTheStockTopCentre()
     {
         var frame = new SetupFrame(SetupOrientation.ThreeAxis, 10, 20, 30, 0);

@@ -300,6 +300,9 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
             {
                 case SetupRow setup:
                     setup.Refresh();
+
+                    // Keep-outs fixed in the setup's WCS move when the stock is turned.
+                    await workspace.EditAsync(s => Scene.RefreshAsync(s));
                     break;
                 case OperationRow operation:
                     operation.Refresh(ToolName(session, operation.Operation));

@@ -80,6 +80,21 @@ public sealed class MachiningPagesTests : IAsyncDisposable
         Assert.Equal(WcsReference.StockTopCenter, setupEditor.Reference.Value);
         Assert.False(setupEditor.IsRotary);
 
+        // Multi-sided: the stock turned over, spun and held by tabs at a set depth.
+        Assert.True(setupEditor.IsThreeAxis);
+        Assert.Equal(StockFace.Top, setupEditor.Face.Value);
+        Assert.Null(setupEditor.Spin.Value);
+        Assert.StartsWith("Automatic", setupEditor.HoldingFields[0].Hint, StringComparison.Ordinal);
+        setupEditor.Face = SetupEditor.Faces.Single(f => f.Value == StockFace.Bottom);
+        setupEditor.Spin = SetupEditor.Spins.Single(s => s.Value == 180);
+        setupEditor.Anchor = SetupEditor.Anchors.Single(a => a.Value == TurnAnchor.FrontLeft);
+        setupEditor.HoldingFields[0].Text = "4";
+        setupEditor.HoldingFields[1].Text = "3";
+        await FlushAsync();
+        Assert.Equal((StockFace.Bottom, (int?)180, TurnAnchor.FrontLeft), (second.Setup.Face, second.Setup.Spin, second.Setup.Anchor));
+        Assert.Equal(((double?)4, 3), (second.Setup.DepthLimit, second.Setup.TabCount));
+        Assert.StartsWith("3-axis, bottom face up", second.Detail, StringComparison.Ordinal);
+
         await page.MoveSetupUpCommand.ExecuteAsync(second);
         Assert.Equal("Flipped", page.Setups[0].Title);
         Assert.Equal("Flipped", session.Setups[0].Name);
