@@ -43,6 +43,10 @@ public sealed partial class SetupViewModel : ViewModelBase
     private readonly IFeederShell shell;
     private int pairingCount = -1;
 
+    // Set once a status update reports the pairing window we opened; updates sent before
+    // the window opened (still in flight on a slow link) must not clear the new code.
+    private bool pairingConfirmed;
+
     public SetupViewModel(IFeederShell shell)
     {
         this.shell = shell;
@@ -151,9 +155,18 @@ public sealed partial class SetupViewModel : ViewModelBase
             return;
         }
 
-        if (PairingActive && !status.PairingActive)
+        if (PairingActive)
         {
-            ClearPairingCode();
+            if (status.PairingActive)
+            {
+                pairingConfirmed = true;
+            }
+            else if (pairingConfirmed
+                || (pairingCount >= 0 && status.PairingCount != pairingCount)
+                || PairingExpiresAt <= DateTimeOffset.UtcNow)
+            {
+                ClearPairingCode();
+            }
         }
 
         if (pairingCount != status.PairingCount)
@@ -243,6 +256,7 @@ public sealed partial class SetupViewModel : ViewModelBase
             PairingCode = code.Code;
             PairingFingerprint = CertificateFingerprint.Format(code.CertificateFingerprint);
             PairingExpiresAt = code.ExpiresAt?.ToDateTimeOffset();
+            pairingConfirmed = false;
             PairingActive = true;
             UpdateCountdown();
         }
