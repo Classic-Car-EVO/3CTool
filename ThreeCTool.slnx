@@ -6,6 +6,7 @@
     <Project Path="src/ThreeCTool.Cutting/ThreeCTool.Cutting.csproj" />
     <Project Path="src/ThreeCTool.Data/ThreeCTool.Data.csproj" />
     <Project Path="src/ThreeCTool.Desktop/ThreeCTool.Desktop.csproj" />
+    <Project Path="src/ThreeCTool.Feeder.Client/ThreeCTool.Feeder.Client.csproj" />
     <Project Path="src/ThreeCTool.Feeder.Contracts/ThreeCTool.Feeder.Contracts.csproj" />
     <Project Path="src/ThreeCTool.Feeder.Service/ThreeCTool.Feeder.Service.csproj" />
     <Project Path="src/ThreeCTool.Feeder/ThreeCTool.Feeder.csproj" />

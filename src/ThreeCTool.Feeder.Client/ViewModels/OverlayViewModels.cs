@@ -54,6 +54,9 @@ public sealed partial class PromptViewModel : ViewModelBase
 
     public string RpmText => Display.Number(Rpm) + " rpm";
 
+    /// <summary>Prompts are answered at the machine (touch screen or direct connection), not from a paired desktop.</summary>
+    public bool CanAnswerHere => shell.IsLocal;
+
     /// <summary>Set once answered; the prompt closes when the feeder clears it.</summary>
     [ObservableProperty]
     [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
@@ -84,9 +87,9 @@ public sealed partial class PromptViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanAnswerCancel))]
     private Task CancelAsync() => AnswerAsync(false);
 
-    private bool CanAnswer() => !Answered;
+    private bool CanAnswer() => !Answered && CanAnswerHere;
 
-    private bool CanAnswerCancel() => !Answered && CanCancel;
+    private bool CanAnswerCancel() => CanAnswer() && CanCancel;
 
     private async Task AnswerAsync(bool confirmed)
     {

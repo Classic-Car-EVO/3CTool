@@ -25,11 +25,12 @@ public sealed partial class MainViewModel : ViewModelBase, IFeederShell, IDispos
     private string? dismissedFeedbackRunId;
     private bool wasConnected;
 
-    public MainViewModel(FeederConnection connection, PreviewRenderer renderer = PreviewRenderer.Auto)
+    public MainViewModel(FeederConnection connection, PreviewRenderer renderer = PreviewRenderer.Auto, bool isLocal = true)
     {
         ArgumentNullException.ThrowIfNull(connection);
         this.connection = connection;
         Renderer = renderer;
+        IsLocal = isLocal;
         Jobs = new JobsViewModel(this);
         Run = new RunViewModel(this);
         Jog = new JogViewModel(this);
@@ -45,6 +46,8 @@ public sealed partial class MainViewModel : ViewModelBase, IFeederShell, IDispos
     public FeederStatus? Status => connection.Status;
 
     public PreviewRenderer Renderer { get; }
+
+    public bool IsLocal { get; }
 
     public JobsViewModel Jobs { get; }
 

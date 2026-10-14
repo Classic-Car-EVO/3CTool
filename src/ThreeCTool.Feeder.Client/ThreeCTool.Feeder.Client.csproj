@@ -1,0 +1,23 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <!-- Feeder view models, views and status connection, shared by the touch UI and the desktop Machine page.
+       The views use style classes (label, value, panel, dialog, selected, jog, key, primary, danger) and brushes
+       (PanelBrush, AccentBrush, DangerBrush, WarningBrush, MutedBrush) that the hosting app provides. -->
+  <PropertyGroup>
+    <RootNamespace>ThreeCTool.Feeder</RootNamespace>
+    <AvaloniaUseCompiledBindingsByDefault>true</AvaloniaUseCompiledBindingsByDefault>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="ThreeCTool.Feeder.Tests" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Avalonia" />
+    <PackageReference Include="CommunityToolkit.Mvvm" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\ThreeCTool.Rendering\ThreeCTool.Rendering.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
+  </ItemGroup>
+</Project>

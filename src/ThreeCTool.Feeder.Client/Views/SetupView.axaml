@@ -21,6 +21,9 @@
   <Grid RowDefinitions="*,Auto">
     <ScrollViewer>
       <StackPanel Spacing="2" Margin="4,0,12,0">
+        <TextBlock Text="Settings and desktop pairing are managed on the feeder's own screen." Classes="label" TextWrapping="Wrap"
+                   IsVisible="{Binding !IsLocal}" />
+        <StackPanel Spacing="2" IsVisible="{Binding IsLocal}">
         <TextBlock Text="Feeder" Classes="section" />
         <ItemsControl ItemsSource="{Binding General}" ItemTemplate="{StaticResource SettingRow}" />
 
@@ -68,6 +71,7 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+        </StackPanel>
 
         <TextBlock Text="About" Classes="section" />
         <Grid ColumnDefinitions="Auto,*" RowDefinitions="Auto,Auto,Auto,Auto">

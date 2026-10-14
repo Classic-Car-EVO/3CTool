@@ -28,6 +28,9 @@ public sealed class DesktopSettings
 
     public bool ShowRapids { get; set; } = true;
 
+    /// <summary>Machine profile driven by the direct (USB/TCP) connection; null = not linked.</summary>
+    public Guid? DirectMachineProfileId { get; set; }
+
     public DesktopSettings Clone() => JsonSerializer.Deserialize<DesktopSettings>(JsonSerializer.Serialize(this, SettingsJson.Options), SettingsJson.Options)!;
 }
 

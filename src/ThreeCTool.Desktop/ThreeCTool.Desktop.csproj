@@ -48,5 +48,6 @@
     <ProjectReference Include="..\ThreeCTool.Streaming\ThreeCTool.Streaming.csproj" />
     <ProjectReference Include="..\ThreeCTool.Feeder.Contracts\ThreeCTool.Feeder.Contracts.csproj" />
     <ProjectReference Include="..\ThreeCTool.Feeder.Service\ThreeCTool.Feeder.Service.csproj" />
+    <ProjectReference Include="..\ThreeCTool.Feeder.Client\ThreeCTool.Feeder.Client.csproj" />
   </ItemGroup>
 </Project>

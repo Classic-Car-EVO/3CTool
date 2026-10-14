@@ -25,6 +25,12 @@ public interface IFeederShell
     /// <summary>Latest status; null while the feeder service is not reachable.</summary>
     FeederStatus? Status { get; }
 
+    /// <summary>
+    /// True on the feeder's local socket (touch screen, direct desktop connection): settings, pairing and operator
+    /// prompts are only available there; a paired desktop only watches and controls jobs.
+    /// </summary>
+    bool IsLocal { get; }
+
     PreviewRenderer Renderer { get; }
 
     /// <summary>Runs a call; an <see cref="RpcException"/> is shown to the operator and false returned.</summary>

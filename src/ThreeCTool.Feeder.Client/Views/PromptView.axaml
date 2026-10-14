@@ -18,6 +18,8 @@
         <Button Grid.Column="2" Name="EditRpm" Content="Change..." Command="{Binding EditRpmCommand}" />
       </Grid>
       <StackPanel Grid.Row="3" Orientation="Horizontal" Spacing="8" HorizontalAlignment="Right">
+        <TextBlock Name="AnswerAtMachine" Text="Answer this prompt at the machine." Foreground="{StaticResource WarningBrush}"
+                   VerticalAlignment="Center" FontSize="16" IsVisible="{Binding !CanAnswerHere}" />
         <Button Content="Cancel job step" Command="{Binding CancelCommand}" IsVisible="{Binding CanCancel}" Classes="danger" />
         <Button Name="Confirm" Content="{Binding ConfirmText}" Command="{Binding ConfirmCommand}" Classes="primary" MinWidth="180" MinHeight="60" />
       </StackPanel>

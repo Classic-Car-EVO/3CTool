@@ -127,9 +127,17 @@ public sealed partial class SetupViewModel : ViewModelBase
 
     private DateTimeOffset? PairingExpiresAt { get; set; }
 
+    /// <summary>Settings and pairing sections are shown on the feeder's local socket only.</summary>
+    public bool IsLocal => shell.IsLocal;
+
     public async Task LoadAsync()
     {
         await LoadInfoAsync();
+        if (!shell.IsLocal)
+        {
+            return;
+        }
+
         await LoadSettingsAsync();
         await LoadPairingsAsync();
     }
@@ -138,7 +146,7 @@ public sealed partial class SetupViewModel : ViewModelBase
     {
         Controller = status is null ? string.Empty
             : string.Join(" · ", new[] { status.Controller, status.Firmware, status.Connection.ToString() }.Where(s => s.Length > 0));
-        if (status is null)
+        if (status is null || !shell.IsLocal)
         {
             return;
         }

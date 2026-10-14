@@ -3,9 +3,12 @@ using System.Data.Common;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Grpc.Core;
+
 using Microsoft.EntityFrameworkCore;
 
 using ThreeCTool.Desktop.Services;
+using ThreeCTool.Feeder.Contracts;
 
 namespace ThreeCTool.Desktop.ViewModels;
 
@@ -22,9 +25,10 @@ public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
         Workspace = new ProjectWorkspace(this);
         Project = new ProjectViewModel(this, Workspace);
         Machining = new MachiningViewModel(this, Workspace);
+        Machine = new MachineViewModel(this, Workspace);
         Library = new LibraryViewModel(this);
         Settings = new SettingsViewModel(this);
-        Pages = [Project, Machining, Library, Settings];
+        Pages = [Project, Machining, Machine, Library, Settings];
         SelectedPage = Project;
         Workspace.PropertyChanged += (_, e) =>
         {
@@ -50,6 +54,8 @@ public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
     public ProjectViewModel Project { get; }
 
     public MachiningViewModel Machining { get; }
+
+    public MachineViewModel Machine { get; }
 
     public LibraryViewModel Library { get; }
 
@@ -95,7 +101,11 @@ public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
         MessageIsError = isError;
     }
 
-    public void Dispose() => Machining.Dispose();
+    public void Dispose()
+    {
+        Machining.Dispose();
+        Machine.Dispose();
+    }
 
     public async Task<bool> ConfirmAsync(string title, string message, string confirmText = "OK", bool danger = false)
     {
@@ -158,6 +168,8 @@ public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
         or ArgumentException
         or DbException
         or DbUpdateException
+        or RpcException
+        or PairingRejectedException
         or ILGPU.Runtime.AcceleratorException
         or ILGPU.InternalCompilerException
         or ILGPU.Backends.InvalidCodeGenerationException;
@@ -165,6 +177,14 @@ public sealed partial class MainViewModel : ViewModelBase, IShell, IDisposable
     private static string Describe(Exception ex) => ex switch
     {
         DbUpdateException { InnerException: { } inner } => "Could not save to the library: " + inner.Message,
+        RpcException rpc => rpc.StatusCode switch
+        {
+            StatusCode.Unavailable => "The feeder is not reachable" + (rpc.Status.Detail.Length > 0 ? $" ({rpc.Status.Detail})." : "."),
+            StatusCode.Unauthenticated or StatusCode.PermissionDenied => "The feeder refused the request: " + rpc.Status.Detail,
+            StatusCode.DeadlineExceeded => "The feeder did not answer in time.",
+            _ => rpc.Status.Detail.Length > 0 ? rpc.Status.Detail : "Feeder error: " + rpc.StatusCode,
+        },
+        PairingRejectedException => "Pairing failed: " + ex.Message,
         ILGPU.Runtime.AcceleratorException or ILGPU.InternalCompilerException or ILGPU.Backends.InvalidCodeGenerationException =>
             $"The compute device failed ({ex.GetType().Name}). Select the CPU backend in Settings and try again.",
         _ => ex.Message,

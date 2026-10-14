@@ -5,6 +5,14 @@
              x:Class="ThreeCTool.Feeder.Views.MainView"
              x:DataType="vm:MainViewModel"
              Background="#121518">
+  <UserControl.DataTemplates>
+    <DataTemplate DataType="vm:KeyboardViewModel"><views:KeyboardView /></DataTemplate>
+    <DataTemplate DataType="vm:ConfirmViewModel"><views:ConfirmView /></DataTemplate>
+    <DataTemplate DataType="vm:PromptViewModel"><views:PromptView /></DataTemplate>
+    <DataTemplate DataType="vm:RecoveryViewModel"><views:RecoveryView /></DataTemplate>
+    <DataTemplate DataType="vm:FeedbackViewModel"><views:FeedbackView /></DataTemplate>
+  </UserControl.DataTemplates>
+
   <Grid RowDefinitions="Auto,Auto,*,Auto">
     <!-- Status bar -->
     <Border Grid.Row="0" Background="#1E2226" Padding="8,4">

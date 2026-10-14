@@ -75,7 +75,8 @@ public sealed class CamProjectFixture : IAsyncLifetime
     }
 }
 
-public sealed class CamPipelineTests(CamProjectFixture project) : IClassFixture<CamProjectFixture>
+[Collection(CamProjectGroup.Name)]
+public sealed class CamPipelineTests(CamProjectFixture project)
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
