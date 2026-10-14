@@ -313,6 +313,46 @@ public sealed class MachiningPagesTests : IAsyncDisposable
         Assert.Single(page.Files);
     }
 
+    [Fact]
+    public async Task Run_SplitStockMachinesEachPieceAndShowsThemOneAtATime()
+    {
+        var page = await OpenAsync();
+        await PrepareAsync();
+        Assert.True(await main!.Workspace.EditAsync(async s =>
+        {
+            var b = (await s.MillPartAsync()).Bounds;
+            StockTiling.Fit(s.Stock, "Board", 14, 20, 10, (b.Min.X, b.Min.Y, b.Min.Z, b.Max.X, b.Max.Y, b.Max.Z), 2);
+            await s.SaveAsync();
+        }));
+        await AddOperationsAsync(page);
+        Assert.True(page.IsTiled);
+        Assert.Equal(["Piece 1 (column 1, row 1, layer 1)", "Piece 2 (column 2, row 1, layer 1)"], page.PieceChoices.Select(c => c.Label));
+        Assert.Equal(page.PieceChoices[0], page.SelectedPiece);
+        Assert.StartsWith("The stock is split into 2 pieces", page.TilingSummary, StringComparison.Ordinal);
+        Assert.Empty(page.TilingProblems);
+
+        await page.RunAllCommand.ExecuteAsync(null);
+        Assert.False(main.MessageIsError, main.Message);
+        Assert.StartsWith("Piece 1: 2 of 2 toolpaths up to date", page.ToolpathSummary, StringComparison.Ordinal);
+        Assert.Equal(4, page.Files.Count);
+        Assert.Equal(["Piece 1, ", "Piece 1, ", "Piece 2, ", "Piece 2, "], page.Files.Select(f => f.Detail[..9]));
+        Assert.All(page.Files, f => Assert.Matches(@"^gcode/P0[12]_01_", f.File.Path));
+        Assert.True(page.Playback.IsAvailable);
+        var firstPaths = page.Scene.Scene.Toolpaths.ToList();
+
+        page.SelectedPiece = page.PieceChoices[1];
+        await Wait.UntilAsync(() => page.ToolpathSummary.StartsWith("Piece 2: 2 of 2", StringComparison.Ordinal), "piece 2 shown");
+        Assert.NotEqual(firstPaths, page.Scene.Scene.Toolpaths);
+        await page.Playback.SettleAsync();
+        Assert.True(page.Playback.IsAvailable);
+
+        main.Workspace.Session!.Setups[0].Orientation = SetupOrientation.Indexed;
+        await page.GenerateCommand.ExecuteAsync(null);
+        Assert.True(main.MessageIsError);
+        Assert.Contains("not 3-axis", main.Message, StringComparison.Ordinal);
+        Assert.Contains("not 3-axis", page.TilingProblems, StringComparison.Ordinal);
+    }
+
     private async Task<MachiningViewModel> OpenAsync()
     {
         await fixture.Library.SaveToolAsync(DesktopFixture.FlatEndMill());

@@ -242,6 +242,90 @@ public sealed class ProjectPagesTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task Stock_StandardSizeSplitsIntoPiecesWithEditableSeams()
+    {
+        var library = services.Library;
+        var otherMaterial = (await library.ListMaterialsAsync())[0].Id;
+        await library.SaveStockSizeAsync(new Core.Materials.StockSize { Name = "Board", SizeX = 14, SizeY = 20, SizeZ = 5 });
+        await library.SaveStockSizeAsync(new Core.Materials.StockSize { Name = "Other", MaterialId = otherMaterial, SizeX = 50, SizeY = 50, SizeZ = 5 });
+        var main = await OpenAsync();
+        var session = await CreateAsync();
+        var folder = session.Folder;
+        var stockPage = main.Project.Stock;
+        Assert.Null(session.Project.MaterialId);
+        Assert.Equal([StockViewModel.FreeSizeLabel, "Board (14 × 20 × 5 mm)"], stockPage.Sizes.Select(s => s.Label));
+        Assert.Equal(stockPage.Sizes[0], stockPage.Size);
+        Assert.False(stockPage.HasPieceSize);
+
+        files.Answers.Enqueue(fixture.WriteBoxStl("block.stl", Vector3.Zero, new Vector3(20, 16, 6)));
+        await main.Project.Parts.ImportCommand.ExecuteAsync(null);
+        stockPage.Margin!.Text = "2";
+        stockPage.Size = stockPage.Sizes[1];
+        await Wait.UntilAsync(() => stockPage.HasPieceSize, "pieces shown");
+        await FlushAsync();
+        var stock = session.Stock;
+        Assert.Equal((28.0, 20.0, 10.0), (stock.SizeX, stock.SizeY, stock.SizeZ));
+        Assert.Equal((-4.0, -2.0, -2.0), (stock.OriginX, stock.OriginY, stock.OriginZ));
+        Assert.StartsWith("4 pieces of Board: 2 along X × 1 along Y × 2 layers", stockPage.PiecesText, StringComparison.Ordinal);
+        Assert.Equal(4, stockPage.PieceList.Count);
+        Assert.Equal(["14", string.Empty, "5"], stockPage.SeamFields.Select(f => f.Text));
+        Assert.Equal(4, stockPage.Layout!.Pieces.Count);
+        Assert.NotNull(stockPage.Layout.Part);
+        Assert.Null(stockPage.TilingProblem);
+
+        var seamsX = stockPage.SeamFields[0];
+        seamsX.Text = "20";
+        Assert.True(seamsX.HasError);
+        seamsX.Text = "a";
+        Assert.True(seamsX.HasError);
+        Assert.Equal([14.0], stock.SeamsX);
+
+        stockPage.BoxFields[3].Text = "30";
+        await Wait.UntilAsync(() => session.Stock.SeamsX.Count == 2, "seams re-spaced");
+        await FlushAsync();
+        Assert.Equal([10.0, 20.0], session.Stock.SeamsX);
+        Assert.StartsWith("6 pieces", stockPage.PiecesText, StringComparison.Ordinal);
+        Assert.False(seamsX.HasError);
+
+        seamsX.Text = "12; 22";
+        Assert.False(seamsX.HasError);
+        await FlushAsync();
+        Assert.Equal([12.0, 22.0], session.Stock.SeamsX);
+
+        await stockPage.MoveSeamCommand.ExecuteAsync(new SeamMove(StockAxis.X, 1, 29));
+        Assert.Equal([12.0, 26.0], session.Stock.SeamsX);
+        Assert.Equal("12; 26", seamsX.Text);
+        await stockPage.EvenSeamsCommand.ExecuteAsync(null);
+        Assert.Equal([10.0, 20.0], session.Stock.SeamsX);
+        Assert.Equal([5.0], session.Stock.SeamsZ);
+
+        await main.Project.CloseCommand.ExecuteAsync(null);
+        await main.Project.OpenFolderAsync(folder);
+        Assert.True(stockPage.HasPieceSize);
+        Assert.Equal("Board (14 × 20 × 5 mm)", stockPage.Size.Label);
+        Assert.Equal("10; 20", stockPage.SeamFields[0].Text);
+
+        stockPage.Size = stockPage.Sizes[0];
+        await Wait.UntilAsync(() => !stockPage.HasPieceSize, "pieces hidden");
+        await FlushAsync();
+        session = main.Workspace.Session!;
+        Assert.Null(session.Stock.PieceName);
+        Assert.Empty(session.Stock.SeamsX);
+        Assert.Equal(30, session.Stock.SizeX, 9);
+    }
+
+    [Fact]
+    public void Stock_SeamTextParsesUnitsAndSeparators()
+    {
+        Assert.True(SeamField.TryParse("600; 1200 ;\n1 in", LengthUnit.Millimeter, out var seams));
+        Assert.Equal([600.0, 1200.0, 25.4], seams);
+        Assert.True(SeamField.TryParse(" ", LengthUnit.Millimeter, out seams));
+        Assert.Empty(seams);
+        Assert.False(SeamField.TryParse("600, 1200", LengthUnit.Millimeter, out _));
+        Assert.Equal("1; 2", SeamField.Format([25.4, 50.8], LengthUnit.Inch));
+    }
+
+    [Fact]
     public void Stock_ChangeTypeKeepsTheStockInPlace()
     {
         var stock = new Stock { Type = StockType.Box, OriginX = 1, OriginY = 2, OriginZ = 3, SizeX = 40, SizeY = 20, SizeZ = 10 };

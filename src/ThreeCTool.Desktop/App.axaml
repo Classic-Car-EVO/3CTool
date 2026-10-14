@@ -19,6 +19,7 @@
     <DataTemplate DataType="vm:MachinesViewModel"><views:MachinesView /></DataTemplate>
     <DataTemplate DataType="vm:ToolsViewModel"><views:ToolsView /></DataTemplate>
     <DataTemplate DataType="vm:MaterialsViewModel"><views:MaterialsView /></DataTemplate>
+    <DataTemplate DataType="vm:StockSizesViewModel"><views:StockSizesView /></DataTemplate>
     <DataTemplate DataType="vm:LearningViewModel"><views:LearningView /></DataTemplate>
     <DataTemplate DataType="vm:SettingsViewModel"><views:SettingsView /></DataTemplate>
     <DataTemplate DataType="vm:ConfirmViewModel"><views:ConfirmView /></DataTemplate>
@@ -30,6 +31,15 @@
         <TextBox Grid.Column="1" Text="{Binding Text}" PlaceholderText="{Binding Hint}" Classes.invalid="{Binding HasError}" />
         <TextBlock Grid.Column="2" Text="{Binding UnitText}" Margin="6,0,0,0" VerticalAlignment="Center" Classes="muted" />
         <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" />
+      </Grid>
+    </DataTemplate>
+
+    <DataTemplate DataType="vm:SeamField">
+      <Grid ColumnDefinitions="190,*,40" RowDefinitions="Auto,Auto" Margin="0,2">
+        <TextBlock Text="{Binding Label}" VerticalAlignment="Center" />
+        <TextBox Grid.Column="1" Text="{Binding Text}" PlaceholderText="none" Classes.invalid="{Binding HasError}" />
+        <TextBlock Grid.Column="2" Text="{Binding UnitText}" Margin="6,0,0,0" VerticalAlignment="Center" Classes="muted" />
+        <TextBlock Grid.Row="1" Grid.ColumnSpan="3" Text="{Binding Error}" IsVisible="{Binding HasError}" Classes="error" TextWrapping="Wrap" />
       </Grid>
     </DataTemplate>
 

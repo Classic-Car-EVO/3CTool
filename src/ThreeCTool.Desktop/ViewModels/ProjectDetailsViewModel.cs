@@ -200,7 +200,16 @@ public sealed partial class ProjectDetailsViewModel(IShell shell, ProjectWorkspa
         }
 
         var rescale = RescaleTolerances;
-        _ = ChangeAsync(s => s.SetMaterialAsync(value.Id, rescale));
+        _ = ChangeMaterialAsync(value.Id, rescale);
+    }
+
+    /// <summary>The project material was changed (the stock sizes offered depend on it).</summary>
+    public event EventHandler? MaterialChanged;
+
+    private async Task ChangeMaterialAsync(Guid materialId, bool rescale)
+    {
+        await ChangeAsync(s => s.SetMaterialAsync(materialId, rescale));
+        MaterialChanged?.Invoke(this, EventArgs.Empty);
     }
 
     [RelayCommand]

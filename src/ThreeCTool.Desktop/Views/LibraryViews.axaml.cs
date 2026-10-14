@@ -42,6 +42,14 @@ public partial class MaterialsView : UserControl
     }
 }
 
+public partial class StockSizesView : UserControl
+{
+    public StockSizesView()
+    {
+        InitializeComponent();
+    }
+}
+
 public partial class LearningView : UserControl
 {
     public LearningView()

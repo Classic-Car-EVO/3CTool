@@ -1,4 +1,5 @@
 using ThreeCTool.Core.Machines;
+using ThreeCTool.Core.Materials;
 using ThreeCTool.Core.Tooling;
 using ThreeCTool.Data;
 using ThreeCTool.Desktop.Services;
@@ -104,6 +105,37 @@ public sealed class LibraryTests : IAsyncDisposable
         await library.LogWearAsync(tool.Id, Core.Learning.WearEventKind.Breakage, "snapped");
         Assert.Equal(ToolStatus.Broken, Assert.Single(await library.ListToolsAsync()).Status);
         Assert.Single(await library.ListWearAsync(tool.Id));
+    }
+
+    [Fact]
+    public async Task StockSizes_AreValidatedAndLoseTheirDeletedMaterial()
+    {
+        var library = fixture.Library;
+        var material = EntityCopy.Clone((await library.ListMaterialsAsync())[0]);
+        material.Id = Guid.CreateVersion7();
+        material.Name = "Birch plywood";
+        material.IsBuiltIn = false;
+        await library.SaveMaterialAsync(material);
+
+        var plywood = new StockSize { Name = "Plywood 18", MaterialId = material.Id, SizeX = 2440, SizeY = 1220, SizeZ = 18 };
+        var any = new StockSize { Name = "Offcut", SizeX = 600, SizeY = 300, SizeZ = 25 };
+        await library.SaveStockSizeAsync(plywood);
+        await library.SaveStockSizeAsync(any);
+        Assert.Equal(["Offcut", "Plywood 18"], (await library.ListStockSizesAsync()).Select(s => s.Name));
+
+        any.SizeZ = 30;
+        await library.SaveStockSizeAsync(any);
+        Assert.Equal(30, (await library.ListStockSizesAsync()).Single(s => s.Id == any.Id).SizeZ);
+
+        await Assert.ThrowsAsync<LibraryValidationException>(() => library.SaveStockSizeAsync(new StockSize { Name = "Flat", SizeX = 10, SizeY = 10 }));
+        await Assert.ThrowsAsync<LibraryValidationException>(() => library.SaveStockSizeAsync(new StockSize { Name = " ", SizeX = 10, SizeY = 10, SizeZ = 1 }));
+        await Assert.ThrowsAsync<LibraryValidationException>(() => library.SaveStockSizeAsync(new StockSize { Name = "Lost", MaterialId = Guid.NewGuid(), SizeX = 10, SizeY = 10, SizeZ = 1 }));
+
+        await library.DeleteMaterialAsync(material.Id);
+        Assert.Null((await library.ListStockSizesAsync()).Single(s => s.Id == plywood.Id).MaterialId);
+
+        await library.DeleteStockSizeAsync(any.Id);
+        Assert.Equal("Plywood 18", Assert.Single(await library.ListStockSizesAsync()).Name);
     }
 
     [Fact]

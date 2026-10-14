@@ -161,7 +161,32 @@ public sealed class LibraryService(string libraryPath, TimeProvider? time = null
         await using var db = await OpenAsync(cancellationToken).ConfigureAwait(false);
         var material = await db.Materials.AsNoTracking().SingleOrDefaultAsync(m => m.Id == id, cancellationToken).ConfigureAwait(false);
         Validate(material is not { IsBuiltIn: true }, "Built-in materials cannot be deleted; duplicate and edit them instead.");
+        await db.StockSizes.Where(s => s.MaterialId == id).ExecuteUpdateAsync(s => s.SetProperty(x => x.MaterialId, (Guid?)null), cancellationToken).ConfigureAwait(false);
         await db.Materials.Where(m => m.Id == id).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task<IReadOnlyList<StockSize>> ListStockSizesAsync(CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        var sizes = await db.StockSizes.AsNoTracking().ToListAsync(cancellationToken).ConfigureAwait(false);
+        return [.. sizes.OrderBy(s => s.Name, StringComparer.CurrentCultureIgnoreCase)];
+    }
+
+    public async Task SaveStockSizeAsync(StockSize size, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(size);
+        Validate(!string.IsNullOrWhiteSpace(size.Name), "The stock size needs a name.");
+        Validate(size.SizeX > 0 && size.SizeY > 0 && size.SizeZ > 0, "Length, width and thickness must be positive.");
+        var copy = EntityCopy.Clone(size);
+        await using var db = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        Validate(copy.MaterialId is not { } materialId || await db.Materials.AnyAsync(m => m.Id == materialId, cancellationToken).ConfigureAwait(false), "The material of the stock size is not in the library.");
+        await ReplaceAsync(db, db.StockSizes.Where(s => s.Id == copy.Id), copy, cancellationToken).ConfigureAwait(false);
+    }
+
+    public async Task DeleteStockSizeAsync(Guid id, CancellationToken cancellationToken = default)
+    {
+        await using var db = await OpenAsync(cancellationToken).ConfigureAwait(false);
+        await db.StockSizes.Where(s => s.Id == id).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(false);
     }
 
     public async Task<IReadOnlyList<FeedCorrection>> ListCorrectionsAsync(CancellationToken cancellationToken = default)

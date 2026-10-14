@@ -145,6 +145,63 @@ public sealed class CamPipelineTests(CamProjectFixture project)
     }
 
     [Fact]
+    public async Task SplitStock_MachinesEveryPieceWithItsOwnFiles()
+    {
+        var (session, rough, finish) = await project.CreateProjectAsync("tiled");
+        await using var _ = session;
+        var bounds = (await session.MillPartAsync()).Bounds;
+        StockTiling.Fit(session.Stock, "Board", 14, 20, 5, (bounds.Min.X, bounds.Min.Y, bounds.Min.Z, bounds.Max.X, bounds.Max.Y, bounds.Max.Z), 2);
+        await session.SaveAsync();
+        Assert.Equal((28.0, 20.0, 10.0), (session.Stock.SizeX, session.Stock.SizeY, session.Stock.SizeZ));
+
+        using var pipeline = new CamPipeline(session, project.Compute);
+        Assert.True(pipeline.IsTiled);
+        Assert.Empty(pipeline.TilingProblems());
+        var pieces = pipeline.Pieces;
+        Assert.Equal(4, pieces.Count);
+
+        var outputs = await pipeline.RunAllAsync();
+        Assert.Empty(pipeline.EmptyPieces);
+        Assert.Equal(4, pipeline.Simulations.Count);
+        Assert.Equal(
+            Enumerable.Range(1, 4).SelectMany(p => project.Outputs.Select(o => $"gcode/P0{p}_{o.FileName["gcode/".Length..]}")),
+            outputs.Select(o => o.FileName));
+        Assert.Equal([1, 1, 2, 2, 3, 3, 4, 4], outputs.Select(o => o.Piece));
+        Assert.Equal(outputs.Select(o => (o.FileName, o.Piece)), (await session.ListGcodeFilesAsync()).Select(f => (f.Path, f.Piece)));
+        Assert.Contains(outputs[0].Lines, l => l.StartsWith("(Mount piece 1 of 4", StringComparison.Ordinal));
+        Assert.DoesNotContain(outputs[1].Lines, l => l.StartsWith("(Mount piece", StringComparison.Ordinal));
+
+        foreach (var piece in pieces)
+        {
+            foreach (var op in new[] { rough, finish })
+            {
+                var generated = pipeline.GetToolpath(op.Id, piece.Number);
+                Assert.NotNull(generated);
+                Assert.Equal(piece.Number, generated.Piece);
+                Assert.Equal(piece.Number, (await session.GetToolpathResultAsync(op.Id, piece.Number))?.Piece);
+                // Roughing clears a band of about one more tool radius around the piece.
+                var reach = (op == rough ? 3 : 1) * session.FindTool(op.ToolId)!.Diameter / 2;
+                var frame = generated.Toolpath.Frame;
+                var cuts = generated.Toolpath.Moves.Where(m => m.Kind == Toolpaths.MoveKind.Cut).Select(m => frame.ToolInPart(m).Tip).ToList();
+                Assert.NotEmpty(cuts);
+                Assert.All(cuts, m => Assert.InRange(m.X, piece.MinX - reach - 0.01, piece.MaxX + reach + 0.01));
+                Assert.All(cuts, m => Assert.InRange(m.Z, piece.MinZ - 0.5, piece.MaxZ));
+            }
+        }
+
+        Assert.NotEqual(pipeline.InputHash(rough, 1), pipeline.InputHash(rough, 2));
+        using (var reloaded = new CamPipeline(session, project.Compute))
+        {
+            Assert.Equal(8, await reloaded.LoadCacheAsync());
+        }
+
+        session.Setups[0].Orientation = SetupOrientation.Indexed;
+        var problem = Assert.Single(pipeline.TilingProblems());
+        Assert.Contains("not 3-axis", problem, StringComparison.Ordinal);
+        await Assert.ThrowsAsync<InvalidOperationException>(() => pipeline.GenerateAsync());
+    }
+
+    [Fact]
     public async Task DirectFeeder_UploadsPostedFilesWithLearningTags()
     {
         var session = project.Session;

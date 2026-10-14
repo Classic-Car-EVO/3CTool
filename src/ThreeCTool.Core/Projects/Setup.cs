@@ -125,6 +125,9 @@ public sealed class ToolpathResult
     /// <summary><see cref="Operation"/> or <see cref="PrintOperation"/> id.</summary>
     public Guid OperationId { get; set; }
 
+    /// <summary>Stock piece number (1-based) when the stock is split into pieces; 0 otherwise.</summary>
+    public int Piece { get; set; }
+
     public string InputHash { get; set; } = string.Empty;
 
     public string CachePath { get; set; } = string.Empty;
@@ -145,6 +148,9 @@ public sealed class GcodeFile
     public Guid Id { get; set; } = Guid.CreateVersion7();
 
     public Guid SetupId { get; set; }
+
+    /// <summary>Stock piece number (1-based) the file machines when the stock is split into pieces; 0 otherwise.</summary>
+    public int Piece { get; set; }
 
     public ToolheadType Head { get; set; }
 

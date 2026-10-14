@@ -1,0 +1,65 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ThreeCTool.Desktop.ViewModels"
+             xmlns:mat="using:ThreeCTool.Core.Materials"
+             xmlns:views="using:ThreeCTool.Desktop.Views"
+             x:Class="ThreeCTool.Desktop.Views.StockSizesView"
+             x:DataType="vm:StockSizesViewModel">
+  <Grid ColumnDefinitions="280,*" Margin="0,8,0,0">
+    <DockPanel Margin="0,0,12,0">
+      <WrapPanel DockPanel.Dock="Top" Margin="0,0,0,6">
+        <Button Name="NewStockSize" Content="New" Command="{Binding NewCommand}" Margin="0,0,4,4" />
+        <Button Name="DuplicateStockSize" Content="Duplicate" Command="{Binding DuplicateCommand}" Margin="0,0,4,4" />
+        <Button Name="DeleteStockSize" Content="Delete" Command="{Binding DeleteCommand}" Margin="0,0,4,4" />
+      </WrapPanel>
+      <ListBox Name="StockSizeList" ItemsSource="{Binding Items}" SelectedItem="{Binding Selected}">
+        <ListBox.ItemTemplate>
+          <DataTemplate x:DataType="mat:StockSize">
+            <StackPanel>
+              <TextBlock Text="{Binding Name}" />
+              <TextBlock Classes="muted" FontSize="12">
+                <TextBlock.Text>
+                  <MultiBinding Converter="{x:Static views:Converters.StockSizeText}">
+                    <Binding />
+                    <Binding Path="$parent[UserControl].DataContext" />
+                  </MultiBinding>
+                </TextBlock.Text>
+              </TextBlock>
+            </StackPanel>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </DockPanel>
+
+    <Grid Grid.Column="1" RowDefinitions="*,Auto" DataContext="{Binding Editor}" x:DataType="vm:StockSizeEditorViewModel"
+          IsVisible="{Binding $parent[UserControl].((vm:StockSizesViewModel)DataContext).Editor, Converter={x:Static ObjectConverters.IsNotNull}}">
+      <ScrollViewer>
+        <StackPanel Margin="0,0,16,0" MaxWidth="900" HorizontalAlignment="Left">
+          <TextBlock Text="Stock size" Classes="section" Margin="0,0,0,4" />
+          <Grid ColumnDefinitions="190,*" RowDefinitions="Auto,Auto" Margin="0,2">
+            <TextBlock Text="Name" VerticalAlignment="Center" />
+            <TextBox Grid.Column="1" Name="StockSizeName" Text="{Binding Model.Name}" />
+            <TextBlock Grid.Row="1" Text="Material" VerticalAlignment="Center" />
+            <ComboBox Grid.Row="1" Grid.Column="1" Name="StockSizeMaterial" ItemsSource="{Binding Materials}" SelectedItem="{Binding Material}"
+                      HorizontalAlignment="Stretch" Margin="0,4,0,0" />
+          </Grid>
+
+          <TextBlock Text="Size" Classes="section" />
+          <ContentControl Content="{Binding SizeX}" />
+          <ContentControl Content="{Binding SizeY}" />
+          <ContentControl Content="{Binding SizeZ}" />
+          <TextBlock Classes="muted" TextWrapping="Wrap" FontSize="12" Margin="0,4,0,0"
+                     Text="When the stock of a project is made of this size and the model is larger, the stock is split into pieces of at most this size (in X, Y and thickness). Each piece gets its own G-code; glue the pieces together afterwards." />
+
+          <TextBlock Text="Notes" Classes="section" />
+          <TextBox Text="{Binding Model.Notes}" AcceptsReturn="True" TextWrapping="Wrap" MinHeight="60" />
+        </StackPanel>
+      </ScrollViewer>
+
+      <StackPanel Grid.Row="1" Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+        <Button Name="SaveStockSize" Content="Save" Classes="primary" Command="{Binding $parent[UserControl].((vm:StockSizesViewModel)DataContext).SaveCommand}" />
+        <Button Content="Revert" Command="{Binding $parent[UserControl].((vm:StockSizesViewModel)DataContext).RevertCommand}" />
+      </StackPanel>
+    </Grid>
+  </Grid>
+</UserControl>

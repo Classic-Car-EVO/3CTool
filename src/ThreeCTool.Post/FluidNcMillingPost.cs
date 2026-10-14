@@ -52,6 +52,11 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         writer.Comment("3C Tool milling program");
         writer.Comment($"Project: {request.Project.Name}");
         writer.Comment($"Setup {setup.Order}: {setup.Name}, {setup.WorkOffset}, {SetupText(setup)}");
+        if (request.Piece is { } piece)
+        {
+            writer.Comment($"Piece {piece.Number} of {request.PieceCount}: {PieceText(piece)}");
+        }
+
         writer.Comment($"Tool: {tool.Name}, {tool.Type}, D{Writer.Format(tool.Diameter)} mm, {tool.FluteCount} flutes, stickout {Writer.Format(tool.Stickout)} mm");
         writer.Comment($"Collet: {request.Collet?.Name ?? "unspecified"}");
         writer.Comment($"Material: {request.Material?.Name ?? "unspecified"}");
@@ -74,6 +79,13 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         writer.Line($"G21 G90 G94 G17 G91.1 {wcs}");
         writer.MachineZ(safeZ);
         writer.Line("M5 M9");
+
+        // Piece change.
+        if (request.Piece is { } mount && request.FirstInSetup)
+        {
+            writer.Comment($"Mount piece {mount.Number} of {request.PieceCount} for setup {setup.Order}: {PieceText(mount)}");
+            writer.Line("M0");
+        }
 
         // Tool change.
         var dial = machine.Spindle.ManualDial ? $", set the spindle dial to {Writer.Format(request.Rpm)} RPM" : string.Empty;
@@ -176,18 +188,26 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
             EstimatedSeconds = seconds,
             Warnings = warnings,
             SetupId = setup.Id,
+            Piece = request.Piece?.Number ?? 0,
             ToolId = tool.Id,
             Rpm = request.Rpm,
         };
     }
 
-    /// <summary>Project-relative output path: <c>gcode/{setup order}_{setup}_T{file index}_{tool}.nc</c>.</summary>
+    /// <summary>
+    /// Project-relative output path: <c>gcode/{setup order}_{setup}_T{file index}_{tool}.nc</c>, prefixed with
+    /// <c>P{piece}_</c> when the stock is split into pieces so each piece's files sort together.
+    /// </summary>
     public static string FileName(MillingPostRequest request)
     {
         ArgumentNullException.ThrowIfNull(request);
+        var piece = request.Piece is { Number: > 0 } p ? string.Create(CultureInfo.InvariantCulture, $"P{p.Number:00}_") : string.Empty;
         return string.Create(CultureInfo.InvariantCulture,
-            $"gcode/{request.Setup.Order:00}_{SafeName(request.Setup.Name, "setup")}_T{request.FileIndex:00}_{SafeName(request.Tool.Name, "tool")}.nc");
+            $"gcode/{piece}{request.Setup.Order:00}_{SafeName(request.Setup.Name, "setup")}_T{request.FileIndex:00}_{SafeName(request.Tool.Name, "tool")}.nc");
     }
+
+    private static string PieceText(StockPiece piece) =>
+        $"{piece.Position}, {Writer.Format(piece.SizeX)} x {Writer.Format(piece.SizeY)} x {Writer.Format(piece.SizeZ)} mm at X{Writer.Format(piece.MinX)} Y{Writer.Format(piece.MinY)} Z{Writer.Format(piece.MinZ)}";
 
     private const string HostMarker = "MC:PROBE";
 

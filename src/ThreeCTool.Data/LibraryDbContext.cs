@@ -21,6 +21,8 @@ public sealed class LibraryDbContext(DbContextOptions<LibraryDbContext> options)
 
     public DbSet<Material> Materials => Set<Material>();
 
+    public DbSet<StockSize> StockSizes => Set<StockSize>();
+
     public DbSet<Filament> Filaments => Set<Filament>();
 
     public DbSet<PrintProfile> PrintProfiles => Set<PrintProfile>();

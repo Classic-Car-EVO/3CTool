@@ -29,6 +29,15 @@
               <ProgressBar Name="RunProgress" Value="{Binding Progress}" Minimum="0" Maximum="100" />
             </StackPanel>
             <TextBlock Text="{Binding ToolpathSummary}" Classes="muted" FontSize="12" TextWrapping="Wrap" />
+            <Grid ColumnDefinitions="Auto,*" IsVisible="{Binding IsTiled}">
+              <TextBlock Text="Show piece" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <ComboBox Grid.Column="1" Name="PieceChoice" ItemsSource="{Binding PieceChoices}" SelectedItem="{Binding SelectedPiece}"
+                        HorizontalAlignment="Stretch" IsEnabled="{Binding IsIdle}" />
+            </Grid>
+            <TextBlock Name="TilingSummary" Text="{Binding TilingSummary}" IsVisible="{Binding TilingSummary, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Classes="muted" FontSize="12" TextWrapping="Wrap" />
+            <TextBlock Name="TilingProblems" Text="{Binding TilingProblems}" IsVisible="{Binding TilingProblems, Converter={x:Static StringConverters.IsNotNullOrEmpty}}"
+                       Classes="error" TextWrapping="Wrap" />
           </StackPanel>
         </Border>
 

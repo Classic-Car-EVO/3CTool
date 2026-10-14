@@ -13,8 +13,9 @@ public sealed partial class LibraryViewModel : PageViewModel
         Machines = new MachinesViewModel(shell);
         Tools = new ToolsViewModel(shell);
         Materials = new MaterialsViewModel(shell);
+        StockSizes = new StockSizesViewModel(shell);
         Learning = new LearningViewModel(shell);
-        Sections = [Machines, Tools, Materials, Learning];
+        Sections = [Machines, Tools, Materials, StockSizes, Learning];
         SelectedSection = Machines;
         ready = true;
     }
@@ -24,6 +25,8 @@ public sealed partial class LibraryViewModel : PageViewModel
     public ToolsViewModel Tools { get; }
 
     public MaterialsViewModel Materials { get; }
+
+    public StockSizesViewModel StockSizes { get; }
 
     public LearningViewModel Learning { get; }
 

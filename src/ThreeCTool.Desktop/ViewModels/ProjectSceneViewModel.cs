@@ -65,7 +65,7 @@ public sealed partial class ProjectSceneViewModel : ObservableObject
             var frames = solid is null || solid.TriangleCount == 0
                 ? []
                 : setups.ToDictionary(s => s.Id, s => MachiningSetup.CreateFrame(s, stock, solid.Bounds));
-            var meshes = SceneBuilder.ProjectMeshes(parts, solid, zones, id => frames.GetValueOrDefault(id));
+            var meshes = SceneBuilder.ProjectMeshes(parts, PieceMeshes(stock) ?? solid, zones, id => frames.GetValueOrDefault(id));
             var bounds = parts.ToDictionary(p => p.Model.Id, p => p.AllBodies().Bounds);
             return (meshes, bounds);
         });
@@ -83,6 +83,32 @@ public sealed partial class ProjectSceneViewModel : ObservableObject
     {
         Scene.SetMeshes([]);
         PartBounds = new Dictionary<Guid, BoundingBox>();
+    }
+
+    /// <summary>A split stock drawn as its pieces with a small gap at every seam; null when it is not split.</summary>
+    private static Mesh? PieceMeshes(Core.Projects.Stock stock)
+    {
+        if (!Core.Projects.StockTiling.IsTiled(stock))
+        {
+            return null;
+        }
+
+        var boxes = Core.Projects.StockTiling.Pieces(stock).Select(piece =>
+        {
+            var gap = Math.Min(0.6, 0.05 * Math.Min(piece.SizeX, Math.Min(piece.SizeY, piece.SizeZ)));
+            var box = new Core.Projects.Stock
+            {
+                Type = Core.Projects.StockType.Box,
+                OriginX = piece.MinX + gap,
+                OriginY = piece.MinY + gap,
+                OriginZ = piece.MinZ + gap,
+                SizeX = piece.SizeX - (2 * gap),
+                SizeY = piece.SizeY - (2 * gap),
+                SizeZ = piece.SizeZ - (2 * gap),
+            };
+            return PartGeometry.StockMesh(box, null);
+        }).OfType<Mesh>();
+        return Mesh.Merge(boxes, "Stock");
     }
 
     [RelayCommand]

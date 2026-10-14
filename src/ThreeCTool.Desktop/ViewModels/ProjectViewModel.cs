@@ -6,6 +6,7 @@ using CommunityToolkit.Mvvm.Input;
 using ThreeCTool.Core.Machines;
 using ThreeCTool.Core.Materials;
 using ThreeCTool.Desktop.Services;
+using ThreeCTool.Geometry;
 using ThreeCTool.Rendering;
 
 namespace ThreeCTool.Desktop.ViewModels;
@@ -33,6 +34,7 @@ public sealed partial class ProjectViewModel : PageViewModel
         Details = new ProjectDetailsViewModel(shell, workspace);
         Parts = new PartsViewModel(shell, workspace, RefreshGeometryAsync);
         Stock = new StockViewModel(shell, workspace, RefreshGeometryAsync);
+        Details.MaterialChanged += (_, _) => _ = workspace.EditAsync(Stock.LoadSizesAsync);
         KeepOuts = new KeepOutsViewModel(shell, workspace, RefreshGeometryAsync);
         workspace.PropertyChanged += (_, e) =>
         {
@@ -249,6 +251,7 @@ public sealed partial class ProjectViewModel : PageViewModel
         {
             await Details.LoadAsync(s);
             Stock.Load(s);
+            await Stock.LoadSizesAsync(s);
             KeepOuts.Load(s);
         });
         await RefreshGeometryAsync();
@@ -260,6 +263,9 @@ public sealed partial class ProjectViewModel : PageViewModel
         if (workspace.Session is { } session)
         {
             Parts.Load(session, Scene.PartBounds);
+            Stock.SetPartBounds(session.Parts
+                .Where(p => p.Role == Core.Projects.BodyRole.Mill && Scene.PartBounds.ContainsKey(p.Id))
+                .Aggregate(BoundingBox.Empty, (all, p) => all.Union(Scene.PartBounds[p.Id])));
         }
     }
 }

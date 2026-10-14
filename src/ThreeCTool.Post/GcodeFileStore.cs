@@ -41,6 +41,7 @@ public static class GcodeFileStore
         db.GcodeFiles.Add(new GcodeFile
         {
             SetupId = output.SetupId,
+            Piece = output.Piece,
             Head = ToolheadType.Spindle,
             ToolId = output.ToolId,
             Path = relative,

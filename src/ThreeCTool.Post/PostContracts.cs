@@ -97,6 +97,12 @@ public sealed class MillingPostRequest
     /// <summary>Position of the file within the setup (1-based), used in the file name.</summary>
     public int FileIndex { get; init; } = 1;
 
+    /// <summary>Stock piece this file machines when the stock is split into standard pieces; null otherwise.</summary>
+    public StockPiece? Piece { get; init; }
+
+    /// <summary>Number of stock pieces (with <see cref="Piece"/>).</summary>
+    public int PieceCount { get; init; }
+
     /// <summary>Machine position of the WCS origin at A = 0, when known; enables absolute travel checks.</summary>
     public System.Numerics.Vector3? WorkOffset { get; init; }
 
@@ -136,6 +142,9 @@ public sealed class PostOutput
     public IReadOnlyList<string> Warnings { get; init; } = [];
 
     public Guid SetupId { get; init; }
+
+    /// <summary>Stock piece number, 0 when the stock is not split.</summary>
+    public int Piece { get; init; }
 
     public Guid ToolId { get; init; }
 

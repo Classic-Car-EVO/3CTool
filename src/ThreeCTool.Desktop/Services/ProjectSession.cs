@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using Microsoft.EntityFrameworkCore;
 
 using ThreeCTool.Core;
@@ -463,6 +465,7 @@ public sealed class ProjectSession : IAsyncDisposable
         Stock.MeshPath = await CopyIntoProjectAsync(sourcePath, sha, cancellationToken).ConfigureAwait(true);
         Stock.MeshSha256 = sha;
         Stock.Type = StockType.Mesh;
+        StockTiling.Update(Stock);
         await SaveAsync(cancellationToken).ConfigureAwait(true);
     }
 
@@ -628,13 +631,13 @@ public sealed class ProjectSession : IAsyncDisposable
 
     // ----- Results -----
 
-    /// <summary>Stored result of an operation (<see cref="SaveToolpathResultAsync"/> keeps one per operation).</summary>
-    public async Task<ToolpathResult?> GetToolpathResultAsync(Guid operationId, CancellationToken cancellationToken = default) =>
-        await db.ToolpathResults.AsNoTracking().FirstOrDefaultAsync(r => r.OperationId == operationId, cancellationToken).ConfigureAwait(true);
+    /// <summary>Stored result of an operation for a stock piece (<see cref="SaveToolpathResultAsync"/> keeps one per operation and piece).</summary>
+    public async Task<ToolpathResult?> GetToolpathResultAsync(Guid operationId, int piece = 0, CancellationToken cancellationToken = default) =>
+        await db.ToolpathResults.AsNoTracking().FirstOrDefaultAsync(r => r.OperationId == operationId && r.Piece == piece, cancellationToken).ConfigureAwait(true);
 
     internal async Task SaveToolpathResultAsync(ToolpathResult result, CancellationToken cancellationToken)
     {
-        await db.ToolpathResults.Where(r => r.OperationId == result.OperationId).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(true);
+        await db.ToolpathResults.Where(r => r.OperationId == result.OperationId && r.Piece == result.Piece).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(true);
         db.ToolpathResults.Add(result);
         await db.SaveChangesAsync(cancellationToken).ConfigureAwait(true);
         db.Entry(result).State = EntityState.Detached;
@@ -646,7 +649,11 @@ public sealed class ProjectSession : IAsyncDisposable
         return [.. files.OrderBy(f => f.Path, StringComparer.Ordinal)];
     }
 
-    public string ToolpathCachePath(Guid operationId) => Path.Combine(Folder, ToolpathsFolder, operationId.ToString("N") + ".3ctp");
+    /// <summary>Toolpath cache file of an operation; <paramref name="piece"/> is the stock piece number (0 when not split).</summary>
+    public string ToolpathCachePath(Guid operationId, int piece = 0) => Path.Combine(
+        Folder,
+        ToolpathsFolder,
+        operationId.ToString("N") + (piece == 0 ? string.Empty : string.Create(CultureInfo.InvariantCulture, $"_p{piece:00}")) + ".3ctp");
 
     public async ValueTask DisposeAsync()
     {
@@ -712,9 +719,18 @@ public sealed class ProjectSession : IAsyncDisposable
         }
 
         await db.ToolpathResults.Where(r => operations.Contains(r.OperationId)).ExecuteDeleteAsync(cancellationToken).ConfigureAwait(true);
+        var folder = Path.Combine(Folder, ToolpathsFolder);
+        if (!Directory.Exists(folder))
+        {
+            return;
+        }
+
         foreach (var id in operations)
         {
-            TryDelete(ToolpathCachePath(id));
+            foreach (var file in Directory.EnumerateFiles(folder, id.ToString("N") + "*.3ctp"))
+            {
+                TryDelete(file);
+            }
         }
     }
 

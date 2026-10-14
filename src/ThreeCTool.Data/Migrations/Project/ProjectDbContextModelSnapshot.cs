@@ -495,6 +495,9 @@ namespace ThreeCTool.Data.Migrations.Project
                         .IsRequired()
                         .HasColumnType("TEXT");
 
+                    b.Property<int>("Piece")
+                        .HasColumnType("INTEGER");
+
                     b.Property<double?>("Rpm")
                         .HasColumnType("REAL");
 
@@ -790,6 +793,30 @@ namespace ThreeCTool.Data.Migrations.Project
                     b.Property<double>("OriginZ")
                         .HasColumnType("REAL");
 
+                    b.Property<string>("PieceName")
+                        .HasColumnType("TEXT");
+
+                    b.Property<double>("PieceSizeX")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("PieceSizeY")
+                        .HasColumnType("REAL");
+
+                    b.Property<double>("PieceSizeZ")
+                        .HasColumnType("REAL");
+
+                    b.PrimitiveCollection<string>("SeamsX")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("SeamsY")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
+                    b.PrimitiveCollection<string>("SeamsZ")
+                        .IsRequired()
+                        .HasColumnType("TEXT");
+
                     b.Property<double>("SizeX")
                         .HasColumnType("REAL");
 
@@ -836,6 +863,9 @@ namespace ThreeCTool.Data.Migrations.Project
 
                     b.Property<Guid>("OperationId")
                         .HasColumnType("TEXT");
+
+                    b.Property<int>("Piece")
+                        .HasColumnType("INTEGER");
 
                     b.Property<double>("RapidLength")
                         .HasColumnType("REAL");

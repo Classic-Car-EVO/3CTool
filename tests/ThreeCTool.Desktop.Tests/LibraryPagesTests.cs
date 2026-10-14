@@ -284,6 +284,52 @@ public sealed class LibraryPagesTests : IAsyncDisposable
     }
 
     [Fact]
+    public async Task StockSizes_CreateDuplicateAndDelete()
+    {
+        var main = await OpenAsync();
+        Assert.Contains(main.Library.StockSizes, main.Library.Sections);
+        var sizes = main.Library.StockSizes;
+        await sizes.ShowAsync();
+        Assert.Empty(sizes.Items);
+
+        await sizes.NewCommand.ExecuteAsync(null);
+        var editor = Assert.IsType<StockSizeEditorViewModel>(sizes.Editor);
+        Assert.Equal(StockSizesViewModel.AnyMaterial, editor.Material.Label);
+        editor.Model.Name = "Plywood 18";
+        editor.SizeX.Text = "2440";
+        editor.SizeY.Text = "1220";
+        editor.SizeZ.Text = "0";
+        await sizes.SaveCommand.ExecuteAsync(null);
+        Assert.True(main.MessageIsError);
+        Assert.Contains("Thickness", main.Message, StringComparison.Ordinal);
+        Assert.Empty(await Library.ListStockSizesAsync());
+
+        editor.SizeZ.Text = "18";
+        var birch = editor.Materials.First(m => m.Value is not null);
+        editor.Material = birch;
+        await sizes.SaveCommand.ExecuteAsync(null);
+        Assert.False(main.MessageIsError, main.Message);
+        var saved = Assert.Single(await Library.ListStockSizesAsync());
+        Assert.Equal((2440.0, 1220.0, 18.0, birch.Value), (saved.SizeX, saved.SizeY, saved.SizeZ, saved.MaterialId));
+        Assert.Equal(saved.Id, sizes.Selected?.Id);
+        Assert.Equal($"2440 × 1220 × 18 mm, {birch.Label}", sizes.Describe(sizes.Selected!));
+
+        await sizes.DuplicateCommand.ExecuteAsync(null);
+        sizes.Editor!.Material = sizes.Editor.Materials[0];
+        await sizes.SaveCommand.ExecuteAsync(null);
+        Assert.False(main.MessageIsError, main.Message);
+        var copy = (await Library.ListStockSizesAsync()).Single(s => s.Name == "Plywood 18 (copy)");
+        Assert.Null(copy.MaterialId);
+        Assert.EndsWith(StockSizesViewModel.AnyMaterial, sizes.Describe(copy), StringComparison.Ordinal);
+
+        var deleting = sizes.DeleteCommand.ExecuteAsync(null);
+        await Wait.AnswerAsync(main, confirm: true);
+        await deleting;
+        Assert.Equal(saved.Id, Assert.Single(await Library.ListStockSizesAsync()).Id);
+        Assert.Single(sizes.Items);
+    }
+
+    [Fact]
     public async Task Learning_ListsAndResetsCorrections()
     {
         var tool = DesktopFixture.FlatEndMill();

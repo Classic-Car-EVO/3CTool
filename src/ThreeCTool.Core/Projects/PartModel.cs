@@ -107,6 +107,24 @@ public sealed class Stock
     public string? MeshPath { get; set; }
 
     public string? MeshSha256 { get; set; }
+
+    /// <summary>Name of the standard material size the box stock is made of; null for one free-size block.</summary>
+    public string? PieceName { get; set; }
+
+    /// <summary>Box: standard piece size; 0 when the stock is not made of standard pieces.</summary>
+    public double PieceSizeX { get; set; }
+
+    public double PieceSizeY { get; set; }
+
+    public double PieceSizeZ { get; set; }
+
+    /// <summary>Box: X positions where the stock is split into pieces (butt joints), ascending, from the stock origin.</summary>
+    public List<double> SeamsX { get; set; } = [];
+
+    public List<double> SeamsY { get; set; } = [];
+
+    /// <summary>Box: heights of glued layer joints, ascending, from the stock bottom.</summary>
+    public List<double> SeamsZ { get; set; } = [];
 }
 
 public enum KeepOutAttachment

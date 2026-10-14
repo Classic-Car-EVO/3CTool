@@ -73,7 +73,9 @@ internal static class PostFixture
         StepSummary? summary = null,
         Vector3? workOffset = null,
         TouchPlateSpot? touchPlate = null,
-        Project? project = null)
+        Project? project = null,
+        StockPiece? piece = null,
+        int pieceCount = 0)
     {
         setup ??= Setup();
         tool ??= Tool();
@@ -104,6 +106,8 @@ internal static class PostFixture
             OverrideVerification = overrideVerification,
             InputHashes = new Dictionary<string, string> { ["toolpaths"] = "abc" },
             GeneratorVersion = "9.9.9",
+            Piece = piece,
+            PieceCount = pieceCount,
         };
     }
 

@@ -50,6 +50,7 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
     private SimulationResult? shownSimulation;
     private CancellationTokenSource? cancel;
     private bool loading;
+    private bool updatingPieces;
 
     public MachiningViewModel(IShell shell, ProjectWorkspace workspace)
         : base(shell, "Machining")
@@ -136,6 +137,24 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
 
     [ObservableProperty]
     public partial string ToolpathSummary { get; private set; } = string.Empty;
+
+    /// <summary>The stock is split into pieces (Project page, Stock): results are shown for one piece at a time.</summary>
+    [ObservableProperty]
+    public partial bool IsTiled { get; private set; }
+
+    /// <summary>Pieces that hold part of the model.</summary>
+    [ObservableProperty]
+    public partial IReadOnlyList<Choice<int>> PieceChoices { get; private set; } = [];
+
+    [ObservableProperty]
+    public partial Choice<int>? SelectedPiece { get; set; }
+
+    [ObservableProperty]
+    public partial string TilingSummary { get; private set; } = string.Empty;
+
+    /// <summary>Why the split stock cannot be machined (invalid seams, setups that are not 3-axis).</summary>
+    [ObservableProperty]
+    public partial string TilingProblems { get; private set; } = string.Empty;
 
     public ObservableCollection<FeedRow> Feeds { get; } = [];
 
@@ -436,7 +455,10 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
     {
         await EnsureFeedsAsync(p, progress, token);
         var result = await p.SimulateAsync(progress, token);
-        Shell.ShowMessage(DescribeReport(result.Report), result.Report.BlocksOutput);
+        var simulations = p.Simulations;
+        Shell.ShowMessage(
+            simulations.Count > 1 ? DescribeAll(simulations) : DescribeReport(result.Report),
+            simulations.Any(s => s.Result.Report.BlocksOutput));
     });
 
     [RelayCommand(CanExecute = nameof(IsIdle))]
@@ -479,6 +501,17 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
         var errors = report.Issues.Count(i => i.Severity == IssueSeverity.Error);
         var warnings = report.Issues.Count(i => i.Severity == IssueSeverity.Warning);
         return $"Simulated: cycle time {PlaybackViewModel.Clock(report.CycleTime)}, {errors} error(s), {warnings} warning(s).";
+    }
+
+    /// <summary>Totals over the simulated pieces of a split stock.</summary>
+    private static string DescribeAll(IReadOnlyList<PieceSimulation> simulations)
+    {
+        var reports = simulations.Select(s => s.Result.Report).ToList();
+        var errors = reports.Sum(r => r.Issues.Count(i => i.Severity == IssueSeverity.Error));
+        var warnings = reports.Sum(r => r.Issues.Count(i => i.Severity == IssueSeverity.Warning));
+        var blocked = simulations.Where(s => s.Result.Report.BlocksOutput).Select(s => s.Piece.Label).ToList();
+        return $"Simulated {simulations.Count} pieces: total cycle time {PlaybackViewModel.Clock(reports.Sum(r => r.CycleTime))}, {errors} error(s), {warnings} warning(s)."
+            + (blocked.Count == 0 ? string.Empty : $" Errors in {string.Join(", ", blocked)}.");
     }
 
     private async Task RunStageAsync(string stage, Func<CamPipeline, IProgress<CamProgress>, CancellationToken, Task> action)
@@ -550,6 +583,11 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
         IReadOnlyList<GcodeFile> files = [];
         IReadOnlyList<GeneratedToolpath> current = [];
         SimulationResult? simulation = null;
+        IReadOnlyList<PieceSimulation> simulations = [];
+        IReadOnlyList<StockPiece> pieces = [];
+        IReadOnlyList<int> empty = [];
+        IReadOnlyList<string> problems = [];
+        var active = 0;
         var stale = true;
         ProjectSession? session = null;
         var ok = await workspace.EditAsync(async s =>
@@ -558,7 +596,12 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
             var p = Pipeline(s);
             current = p.CurrentToolpaths();
             simulation = p.Simulation;
+            simulations = p.Simulations;
             stale = p.SimulationIsStale;
+            pieces = p.Pieces;
+            empty = [.. p.EmptyPieces];
+            problems = p.TilingProblems();
+            active = p.ActivePiece;
             files = await s.ListGcodeFilesAsync();
         });
         if (!ok || session is null)
@@ -567,18 +610,54 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
         }
 
         var unit = Shell.Services.Settings.DisplayUnit;
+        UpdatePieces(pieces, empty, problems, active);
+        var piece = IsTiled ? $"{pieces.First(p => p.Number == active).Label}: " : string.Empty;
         Scene.Scene.SetToolpaths(SceneBuilder.Toolpaths(current));
         Scene.Scene.SelectedToolpath = SelectedOperation?.Operation.Id;
         var cut = current.Sum(g => g.Toolpath.CutLength);
         var moves = current.Sum(g => g.Toolpath.MoveCount);
         var enabled = session.Setups.Sum(s => s.Operations.Count(o => o.Enabled));
         ToolpathSummary = current.Count == 0
-            ? "No toolpaths generated yet."
-            : $"{current.Count} of {enabled} toolpath{(enabled == 1 ? string.Empty : "s")} up to date: {moves} moves, {Length(cut, unit)} of cutting.";
+            ? $"{piece}No toolpaths generated yet."
+            : $"{piece}{current.Count} of {enabled} toolpath{(enabled == 1 ? string.Empty : "s")} up to date: {moves} moves, {Length(cut, unit)} of cutting.";
         UpdateStatus();
         UpdateFeeds(session, unit);
-        await UpdateSimulationAsync(session, current, simulation, stale, unit);
+        await UpdateSimulationAsync(session, current, simulation, simulations, piece, stale, unit);
         UpdateFiles(session, files);
+    }
+
+    private void UpdatePieces(IReadOnlyList<StockPiece> pieces, IReadOnlyList<int> empty, IReadOnlyList<string> problems, int active)
+    {
+        IsTiled = pieces.Count > 1 || pieces[0].Number > 0;
+        updatingPieces = true;
+        try
+        {
+            PieceChoices = IsTiled
+                ? [.. pieces.Where(p => !empty.Contains(p.Number)).Select(p => new Choice<int>($"{p.Label} ({p.Position})", p.Number))]
+                : [];
+            SelectedPiece = PieceChoices.FirstOrDefault(c => c.Value == active);
+        }
+        finally
+        {
+            updatingPieces = false;
+        }
+
+        TilingSummary = !IsTiled
+            ? string.Empty
+            : $"The stock is split into {pieces.Count} pieces. Each piece is machined on its own with all setups and tools; its G-code files start with its number (P01_, P02_, ...)."
+                + (empty.Count == 0 ? string.Empty : $" Piece{(empty.Count == 1 ? string.Empty : "s")} {string.Join(", ", empty)} hold{(empty.Count == 1 ? "s" : string.Empty)} none of the model and {(empty.Count == 1 ? "is" : "are")} skipped.");
+        TilingProblems = string.Join(" ", problems);
+    }
+
+    partial void OnSelectedPieceChanged(Choice<int>? value)
+    {
+        if (updatingPieces || value is null || pipeline is not { } p || p.ActivePiece == value.Value)
+        {
+            return;
+        }
+
+        p.ActivePiece = value.Value;
+        _ = RefreshResultsAsync();
     }
 
     private void UpdateStatus()
@@ -668,7 +747,8 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
         _ => limit.ToString(),
     };
 
-    private async Task UpdateSimulationAsync(ProjectSession session, IReadOnlyList<GeneratedToolpath> current, SimulationResult? simulation, bool stale, LengthUnit unit)
+    private async Task UpdateSimulationAsync(
+        ProjectSession session, IReadOnlyList<GeneratedToolpath> current, SimulationResult? simulation, IReadOnlyList<PieceSimulation> simulations, string piece, bool stale, LengthUnit unit)
     {
         SimulationIsStale = simulation is not null && stale;
         Issues.Clear();
@@ -676,15 +756,15 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
         {
             SimulationSummary = string.Empty;
             DeviationSummary = string.Empty;
-            BlocksOutput = false;
+            BlocksOutput = simulations.Any(s => s.Result.Report.BlocksOutput);
             Playback.Clear();
             shownSimulation = null;
             return;
         }
 
         var report = simulation.Report;
-        SimulationSummary = DescribeReport(report);
-        BlocksOutput = report.BlocksOutput;
+        SimulationSummary = piece + DescribeReport(report) + (simulations.Count > 1 ? " " + DescribeAll(simulations) : string.Empty);
+        BlocksOutput = report.BlocksOutput || simulations.Any(s => s.Result.Report.BlocksOutput);
         DeviationSummary = report.Deviation is { } d
             ? $"Deviation from the part: max gouge {Length(d.MaxGouge, unit)}, max leftover {Length(d.MaxLeftover, unit)}, mean leftover {Length(d.MeanLeftover, unit)}."
             : string.Empty;
@@ -736,9 +816,10 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
             var tool = file.ToolId is { } id ? session.FindTool(id)?.Name : null;
             var setup = session.Setups.FirstOrDefault(s => s.Id == file.SetupId)?.Name;
             var rpm = file.Rpm is { } r ? string.Create(CultureInfo.InvariantCulture, $", {r:0} rpm") : string.Empty;
+            var piece = file.Piece > 0 ? string.Create(CultureInfo.InvariantCulture, $"Piece {file.Piece}, ") : string.Empty;
             var detail = string.Create(
                 CultureInfo.InvariantCulture,
-                $"{setup ?? "Setup"}, {tool ?? "tool"}, {file.LineCount} lines, about {PlaybackViewModel.Clock(file.EstimatedSeconds)}{rpm}");
+                $"{piece}{setup ?? "Setup"}, {tool ?? "tool"}, {file.LineCount} lines, about {PlaybackViewModel.Clock(file.EstimatedSeconds)}{rpm}");
             Files.Add(new GcodeRow(file, file.Path, detail));
         }
 
@@ -847,6 +928,10 @@ public sealed partial class MachiningViewModel : PageViewModel, IDisposable
         SetupEditor = null;
         OperationEditor = null;
         ToolpathSummary = string.Empty;
+        IsTiled = false;
+        PieceChoices = [];
+        TilingSummary = string.Empty;
+        TilingProblems = string.Empty;
         SimulationSummary = string.Empty;
         DeviationSummary = string.Empty;
         SimulationIsStale = false;
