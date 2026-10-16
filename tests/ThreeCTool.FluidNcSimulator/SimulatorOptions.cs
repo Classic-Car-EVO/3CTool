@@ -20,6 +20,12 @@ public sealed class SimulatorOptions
     /// <summary>Report <c>Bf:</c> (planner blocks and RX bytes available).</summary>
     public bool ReportBuffer { get; set; } = true;
 
+    /// <summary>
+    /// Like an ESP32 board that reboots when its serial port opens: the first line on each connection is lost to a
+    /// restart (banner and <c>ALARM:14</c>).
+    /// </summary>
+    public bool RestartOnFirstLine { get; set; }
+
     /// <summary>Start in alarm until homed (<c>start/must_home</c>).</summary>
     public bool MustHome { get; set; } = true;
 
