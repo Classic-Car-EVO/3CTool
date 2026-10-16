@@ -73,6 +73,26 @@ service LocalAdmin {
   rpc GetSettings(google.protobuf.Empty) returns (FeederSettings);
   rpc UpdateSettings(FeederSettings) returns (FeederSettings);
   rpc ListSerialPorts(google.protobuf.Empty) returns (SerialPortList);
+  rpc GetMaintenance(google.protobuf.Empty) returns (MaintenanceInfo);
+  // Refused while a job is running.
+  rpc RequestMaintenance(MaintenanceRequest) returns (google.protobuf.Empty);
+}
+
+enum MaintenanceAction {
+  MAINTENANCE_ACTION_UNSPECIFIED = 0;
+  // Replaces the touch UI with a login prompt on the console.
+  MAINTENANCE_ACTION_CONSOLE = 1;
+  MAINTENANCE_ACTION_REBOOT = 2;
+  MAINTENANCE_ACTION_POWER_OFF = 3;
+}
+
+message MaintenanceInfo {
+  // False when the daemon is not installed as a system service (development, tests without a directory).
+  bool available = 1;
+}
+
+message MaintenanceRequest {
+  MaintenanceAction action = 1;
 }
 
 message FeederInfo {
@@ -235,6 +255,8 @@ enum PromptKind {
   PROMPT_KIND_PROGRAM_PAUSE = 1;
   // Program pause with the spindle on: the operator enters the dial RPM.
   PROMPT_KIND_SPINDLE = 2;
+  // Yes/No question from the program (MC:ASK); cancel stops the job.
+  PROMPT_KIND_CHOICE = 3;
 }
 
 message Prompt {
@@ -251,6 +273,8 @@ message PromptAnswer {
   bool confirmed = 2;
   // Spindle prompts: RPM set on the dial (0 = as suggested).
   double rpm = 3;
+  // Choice prompts (confirmed): true = Yes, false = No.
+  bool choice = 4;
 }
 
 message JogRequest {

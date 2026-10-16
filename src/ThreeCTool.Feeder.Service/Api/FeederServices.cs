@@ -305,7 +305,9 @@ public sealed class LocalAdminService(
     PairingManager pairing,
     FeederIdentity identity,
     SettingsStore settings,
-    JobManager jobs) : LocalAdmin.LocalAdminBase
+    JobManager jobs,
+    FeederOptions options,
+    ILogger<LocalAdminService> logger) : LocalAdmin.LocalAdminBase
 {
     private static readonly Empty None = new();
 
@@ -376,4 +378,33 @@ public sealed class LocalAdminService(
         list.Ports.AddRange(System.IO.Ports.SerialPort.GetPortNames().Order(StringComparer.Ordinal));
         return Task.FromResult(list);
     }
+
+    public override Task<MaintenanceInfo> GetMaintenance(Empty request, ServerCallContext context) =>
+        Task.FromResult(new MaintenanceInfo { Available = MaintenanceAvailable });
+
+    public override Task<Empty> RequestMaintenance(MaintenanceRequest request, ServerCallContext context)
+    {
+        var action = request.Action switch
+        {
+            MaintenanceAction.Console => "console",
+            MaintenanceAction.Reboot => "reboot",
+            MaintenanceAction.PowerOff => "poweroff",
+            _ => throw new ArgumentException("Unknown maintenance action."),
+        };
+        if (!MaintenanceAvailable)
+        {
+            throw new FeederStateException("Maintenance is only available on an installed feeder.");
+        }
+
+        if (jobs.IsActive)
+        {
+            throw new FeederStateException("A job is running; stop it first.");
+        }
+
+        logger.MaintenanceRequested(action);
+        File.WriteAllText(Path.Combine(options.MaintenanceDirectory!, action + ".request"), string.Empty);
+        return Task.FromResult(None);
+    }
+
+    private bool MaintenanceAvailable => !string.IsNullOrEmpty(options.MaintenanceDirectory) && Directory.Exists(options.MaintenanceDirectory);
 }

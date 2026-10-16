@@ -7,8 +7,8 @@ Conflicts=getty@tty1.service
 
 [Service]
 Type=simple
-User=3ctool-feeder
-Group=3ctool-feeder
+User=threectool-feeder
+Group=threectool-feeder
 # DRM/KMS display, GPU and touch input.
 SupplementaryGroups=video render input
 ExecStart=/usr/bin/3ctool-feeder-ui --drm

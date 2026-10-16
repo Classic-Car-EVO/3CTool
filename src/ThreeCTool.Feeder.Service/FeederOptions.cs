@@ -17,6 +17,12 @@ public sealed class FeederOptions
     /// <summary>Unix socket for the local touch UI; empty disables it.</summary>
     public string? UnixSocketPath { get; set; } = FeederDefaults.UnixSocketPath;
 
+    /// <summary>
+    /// Directory where console/reboot/power-off requests are written as <c>&lt;action&gt;.request</c> files for the
+    /// root-owned systemd path units of the package; empty disables maintenance.
+    /// </summary>
+    public string? MaintenanceDirectory { get; set; }
+
     public TimeSpan ReconnectInterval { get; set; } = TimeSpan.FromSeconds(3);
 
     /// <summary>Status poll interval (<c>?</c>) of the controller connection.</summary>

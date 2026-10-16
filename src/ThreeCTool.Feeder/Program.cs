@@ -1,3 +1,5 @@
+using System.ComponentModel;
+
 using Avalonia;
 
 namespace ThreeCTool.Feeder;
@@ -22,9 +24,23 @@ internal static class Program
 
         App.Options = options;
         var builder = BuildAvaloniaApp();
-        return options.Drm
-            ? builder.StartLinuxDrm(args, options.DrmCard, options.Scaling)
-            : builder.StartWithClassicDesktopLifetime(args);
+        if (!options.Drm)
+        {
+            return builder.StartWithClassicDesktopLifetime(args);
+        }
+
+        try
+        {
+            return builder.StartLinuxDrm(args, options.DrmCard, options.Scaling);
+        }
+        catch (System.ComponentModel.Win32Exception ex)
+        {
+            Console.Error.WriteLine($"Cannot take over the display: {ex.Message} ({ex.NativeErrorCode}).");
+            Console.Error.WriteLine(ex.NativeErrorCode == -13
+                ? "Another program (usually a desktop session) is using the display. Boot the Pi to the console: sudo systemctl set-default multi-user.target && sudo reboot"
+                : "Check the display connection and the --card option.");
+            return 1;
+        }
     }
 
     // Also used by the visual designer.

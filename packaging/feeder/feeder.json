@@ -3,6 +3,7 @@
     "DataDirectory": "/var/lib/3ctool-feeder",
     "Port": 50051,
     "UnixSocketPath": "/run/3ctool-feeder/feeder.sock",
+    "MaintenanceDirectory": "/run/3ctool-feeder",
     "RotaryRadiusMm": 20,
     "RapidRateMmPerMin": 5000
   },

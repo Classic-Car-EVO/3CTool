@@ -17,6 +17,9 @@ internal static partial class FeederLog
     [LoggerMessage(Level = LogLevel.Warning, Message = "Feeder is shutting down; stopping run {RunId}")]
     public static partial void StoppingOnShutdown(this ILogger logger, string runId);
 
+    [LoggerMessage(Level = LogLevel.Warning, Message = "Maintenance requested on the touch screen: {Action}")]
+    public static partial void MaintenanceRequested(this ILogger logger, string action);
+
     [LoggerMessage(Level = LogLevel.Information, Message = "Starting job {Job} as run {RunId}")]
     public static partial void RunStarting(this ILogger logger, string job, string runId);
 

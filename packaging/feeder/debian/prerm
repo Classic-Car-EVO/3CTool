@@ -2,6 +2,8 @@
 set -e
 
 if [ -d /run/systemd/system ] && [ "$1" = remove ]; then
+    systemctl disable --now 3ctool-feeder-maintenance@console.path 3ctool-feeder-maintenance@reboot.path \
+        3ctool-feeder-maintenance@poweroff.path >/dev/null 2>&1 || true
     systemctl stop 3ctool-feeder-ui.service 3ctool-feederd.service >/dev/null 2>&1 || true
     systemctl disable 3ctool-feeder-ui.service 3ctool-feederd.service >/dev/null 2>&1 || true
 fi

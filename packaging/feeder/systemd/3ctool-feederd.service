@@ -6,8 +6,8 @@ After=network-online.target
 
 [Service]
 Type=notify
-User=3ctool-feeder
-Group=3ctool-feeder
+User=threectool-feeder
+Group=threectool-feeder
 # Serial (USB) connection to the controller.
 SupplementaryGroups=dialout
 ExecStart=/usr/bin/3ctool-feederd
