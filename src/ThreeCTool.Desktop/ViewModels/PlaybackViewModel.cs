@@ -79,7 +79,7 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
     /// <summary>The stock and tool currently shown match <see cref="Time"/>.</summary>
     public bool IsSettled => !seeking;
 
-    /// <summary>Shows a new simulation at its end state.</summary>
+    /// <summary>Shows a new simulation at its first move.</summary>
     /// <param name="toolpaths">Tool paths of the simulation steps, in step order.</param>
     public async Task LoadAsync(CamPipeline owner, SimulationResult simulation, IReadOnlyList<GeneratedToolpath> toolpaths, IReadOnlyList<Tool> projectTools, double finishingTolerance)
     {
@@ -102,7 +102,7 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
         Duration = report.CycleTime;
         IsAvailable = true;
         OnPropertyChanged(nameof(HasDeviation));
-        Time = Duration;
+        Time = 0;
         await ShowAsync();
     }
 

@@ -228,10 +228,10 @@
           <StackPanel Spacing="4">
             <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
               <Button Content="|&lt;" Command="{Binding Playback.ToStartCommand}" ToolTip.Tip="Start" Margin="0,0,4,0" />
-              <Button Content="&lt;&lt;" Command="{Binding Playback.PreviousStepCommand}" ToolTip.Tip="Previous operation" Margin="0,0,4,0" />
-              <Button Name="PlayPause" Content="Play/Pause" Command="{Binding Playback.PlayPauseCommand}" Margin="0,0,4,0" />
-              <Button Content="&gt;&gt;" Command="{Binding Playback.NextStepCommand}" ToolTip.Tip="Next operation" Margin="0,0,4,0" />
-              <Button Content="&gt;|" Command="{Binding Playback.ToEndCommand}" ToolTip.Tip="End" Margin="0,0,8,0" />
+              <Button Grid.Column="1" Content="&lt;&lt;" Command="{Binding Playback.PreviousStepCommand}" ToolTip.Tip="Previous operation" Margin="0,0,4,0" />
+              <Button Grid.Column="2" Name="PlayPause" Content="Play/Pause" Command="{Binding Playback.PlayPauseCommand}" Margin="0,0,4,0" />
+              <Button Grid.Column="3" Content="&gt;&gt;" Command="{Binding Playback.NextStepCommand}" ToolTip.Tip="Next operation" Margin="0,0,4,0" />
+              <Button Grid.Column="4" Content="&gt;|" Command="{Binding Playback.ToEndCommand}" ToolTip.Tip="End" Margin="0,0,8,0" />
               <Slider Grid.Column="5" Name="PlaybackTime" Minimum="0" Maximum="{Binding Playback.Duration}" Value="{Binding Playback.Time}" VerticalAlignment="Center" />
               <ComboBox Grid.Column="6" ItemsSource="{x:Static vm:PlaybackViewModel.Speeds}" SelectedItem="{Binding Playback.Speed}" Margin="8,0,0,0" />
             </Grid>

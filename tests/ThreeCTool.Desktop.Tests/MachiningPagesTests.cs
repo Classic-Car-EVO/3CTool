@@ -206,10 +206,11 @@ public sealed class MachiningPagesTests : IAsyncDisposable
         Assert.True(playback.IsAvailable);
         await playback.SettleAsync();
         Assert.True(playback.Duration > 0);
-        Assert.Equal(playback.Duration, playback.Time);
+        Assert.Equal(0, playback.Time);
         var scene = page.Scene.Scene;
         Assert.NotEmpty(Assert.Single(scene.Points).Positions);
-        Assert.Null(scene.Progress);
+        Assert.Equal((0, 0), scene.Progress);
+        Assert.Contains("move 1/", playback.PositionText, StringComparison.Ordinal);
 
         playback.SeekTo(1, 2);
         await playback.SettleAsync();
