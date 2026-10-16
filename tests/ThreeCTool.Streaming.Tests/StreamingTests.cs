@@ -119,11 +119,13 @@ public sealed class StreamingTests
         var file = await sim.WriteJobAsync(lines);
         var connection = await sim.ConnectAsync();
         using var streamer = new JobStreamer(connection, file, sim.OpenJournal(), "job1");
-        var prompt = new TaskCompletionSource<string>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var prompt = new TaskCompletionSource<JobPrompt>(TaskCreationOptions.RunContinuationsAsynchronously);
         streamer.PromptRequested += (_, message) => prompt.TrySetResult(message);
         var run = streamer.RunAsync();
 
-        Assert.Equal("Change to tool 2", await prompt.Task.WaitAsync(SimHarness.Timeout));
+        var shown = await prompt.Task.WaitAsync(SimHarness.Timeout);
+        Assert.Equal("Change to tool 2", shown.Message);
+        Assert.True(Jobs.Wire(lines[shown.Line - 1]).StartsWith('M'), $"Line {shown.Line} is the M0.");
         Assert.Equal(JobState.ProgramPaused, streamer.State);
         await Task.Delay(100);
         Assert.False(run.IsCompleted);
@@ -132,6 +134,78 @@ public sealed class StreamingTests
         await streamer.ResumeAsync();
         Assert.Equal(JobState.Completed, await run.WaitAsync(SimHarness.Timeout));
         Jobs.AssertPosition(final, sim.Simulator.PhysicalPosition);
+    }
+
+    [Theory]
+    [InlineData(true, "G0X10Y10", "G0X20Y20")]
+    [InlineData(false, "G0X20Y20", "G0X10Y10")]
+    public async Task RunAsync_Question_StreamsOnlyTheChosenBranch(bool yes, string sent, string skipped)
+    {
+        await using var sim = await SimHarness.StartAsync();
+        string[] lines =
+        [
+            "G21 G90 G54", "G0 Z-1",
+            "(Probe at X10 Y10?)", "(MC:ASK BEGIN)", "G0 X10 Y10", "(Yes branch)", "(MC:ASK ELSE)", "G0 X20 Y20", "(No branch)", "(MC:ASK END)",
+            "G0 X5 Y5", "M0", "G0 X0 Y0",
+        ];
+        var file = await sim.WriteJobAsync(lines);
+        var setupLines = sim.Simulator.ReceivedLines.Count;
+        var connection = await sim.ConnectAsync();
+        var journal = sim.OpenJournal();
+        using var streamer = new JobStreamer(connection, file, journal, "job1");
+        Assert.Contains(streamer.Validate(), p => p.Contains("no operator", StringComparison.Ordinal));
+        var questions = new List<JobQuestion>();
+        var states = new List<JobState>();
+        streamer.AskOperator = (question, _) =>
+        {
+            questions.Add(question);
+            states.Add(streamer.State);
+            return Task.FromResult<bool?>(yes);
+        };
+        var prompts = new List<JobPrompt>();
+        streamer.PromptRequested += (_, prompt) =>
+        {
+            prompts.Add(prompt);
+            _ = Task.Run(streamer.ResumeAsync);
+        };
+        Assert.Empty(streamer.Validate());
+
+        Assert.Equal(JobState.Completed, await streamer.RunAsync().WaitAsync(SimHarness.Timeout));
+        Assert.Equal([new JobQuestion("Probe at X10 Y10?", 4)], questions);
+        Assert.Equal([JobState.ProgramPaused], states);
+        var received = sim.Simulator.ReceivedLines.Skip(setupLines).ToList();
+        Assert.Contains(sent, received);
+        Assert.DoesNotContain(skipped, received);
+        Assert.Equal([new JobPrompt(yes ? "Yes branch" : "No branch", 12)], prompts);
+        Assert.Contains(journal.GetEvents("job1"), e => e.Message == $"Answered {(yes ? "Yes" : "No")}: Probe at X10 Y10?");
+    }
+
+    [Fact]
+    public async Task RunAsync_QuestionCancelled_StopsTheJob()
+    {
+        await using var sim = await SimHarness.StartAsync();
+        var file = await sim.WriteJobAsync(["G21 G90 G54", "(Go on?)", "(MC:ASK BEGIN)", "G0 X10", "(MC:ASK ELSE)", "(MC:ASK END)", "G0 X20"]);
+        var setupLines = sim.Simulator.ReceivedLines.Count;
+        var connection = await sim.ConnectAsync();
+        using var streamer = new JobStreamer(connection, file, sim.OpenJournal(), "job1") { AskOperator = (_, _) => Task.FromResult<bool?>(null) };
+
+        Assert.Equal(JobState.Stopped, await streamer.RunAsync().WaitAsync(SimHarness.Timeout));
+        Assert.DoesNotContain(sim.Simulator.ReceivedLines.Skip(setupLines), l => l.StartsWith("G0X", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task Validate_MalformedQuestions_AreReported()
+    {
+        await using var sim = await SimHarness.StartAsync();
+        var file = await sim.WriteJobAsync(["(MC:ASK ELSE)", "(MC:ASK BEGIN)", "(MC:ASK BEGIN)", "(MC:ASK ELSE)", "(MC:ASK ELSE)"]);
+        var connection = await sim.ConnectAsync();
+        using var streamer = new JobStreamer(connection, file, sim.OpenJournal(), "job1") { AskOperator = (_, _) => Task.FromResult<bool?>(true) };
+
+        var problems = streamer.Validate();
+        Assert.Contains("Line 1: unexpected (MC:ASK ELSE).", problems);
+        Assert.Contains(problems, p => p.StartsWith("Line 3: questions cannot be nested", StringComparison.Ordinal));
+        Assert.Contains("Line 5: unexpected (MC:ASK ELSE).", problems);
+        Assert.Contains("Line 3: the question has no (MC:ASK END).", problems);
     }
 
     [Fact]

@@ -20,6 +20,12 @@ public sealed class JobStreamerOptions
     public TimeSpan PausedHeaterTimeout { get; set; } = TimeSpan.FromMinutes(10);
 }
 
+/// <summary>Yes/No question to the operator from an <c>(MC:ASK BEGIN)</c> block at file line <paramref name="Line"/>.</summary>
+public sealed record JobQuestion(string Text, int Line);
+
+/// <summary>Program pause (<c>M0</c>/<c>M1</c> at file line <paramref name="Line"/>) with the operator message (last comment).</summary>
+public sealed record JobPrompt(string Message, int Line);
+
 /// <summary>
 /// Streams a job file to the controller (section 11.1): character-counting flow control, progress persisted to the
 /// journal, executed-line tracking, pause/resume, M0 prompts, stop with retract, and host directives.
@@ -68,8 +74,13 @@ public sealed class JobStreamer : IDisposable
 
     public event EventHandler<JobState>? StateChanged;
 
-    /// <summary>Raised when an <c>M0</c> pauses the program; the argument is the operator message (last comment).</summary>
-    public event EventHandler<string>? PromptRequested;
+    /// <summary>Raised when an <c>M0</c> pauses the program.</summary>
+    public event EventHandler<JobPrompt>? PromptRequested;
+
+    /// <summary>
+    /// Answers <c>(MC:ASK ...)</c> questions: true = Yes, false = No, null = stop the job. Required when the file asks.
+    /// </summary>
+    public Func<JobQuestion, CancellationToken, Task<bool?>>? AskOperator { get; set; }
 
     public JobState State
     {
@@ -100,6 +111,8 @@ public sealed class JobStreamer : IDisposable
     {
         var problems = new List<string>();
         var lineNumber = options.UseLineNumbers ? (int?)MaxLineNumber : null;
+        var askBegin = 0;
+        var askElse = false;
         foreach (var (line, text) in file.ReadLines())
         {
             var block = GcodeBlock.Parse(text);
@@ -112,6 +125,41 @@ public sealed class JobStreamer : IDisposable
             {
                 problems.Add($"Line {line}: no handler for host directive {directive}.");
             }
+
+            if (block.Directive is { IsAsk: true } ask)
+            {
+                if (ask.IsAskBegin)
+                {
+                    if (askBegin > 0)
+                    {
+                        problems.Add($"Line {line}: questions cannot be nested (the one on line {askBegin} is still open).");
+                    }
+
+                    if (AskOperator is null)
+                    {
+                        problems.Add($"Line {line}: no operator to answer the question {ask}.");
+                    }
+
+                    (askBegin, askElse) = (line, false);
+                }
+                else if (ask.IsAskElse && askBegin > 0 && !askElse)
+                {
+                    askElse = true;
+                }
+                else if (ask.IsAskEnd && askBegin > 0)
+                {
+                    askBegin = 0;
+                }
+                else
+                {
+                    problems.Add($"Line {line}: unexpected {ask}.");
+                }
+            }
+        }
+
+        if (askBegin > 0)
+        {
+            problems.Add($"Line {askBegin}: the question has no (MC:ASK END).");
         }
 
         return problems;
@@ -159,10 +207,39 @@ public sealed class JobStreamer : IDisposable
             await QueryOffsetsAsync(token).ConfigureAwait(false);
 
             var first = true;
+            bool? answer = null;
+            var skipping = false;
             foreach (var (line, text) in file.ReadLines(startLine))
             {
                 token.ThrowIfCancellationRequested();
                 var block = GcodeBlock.Parse(text);
+                if (block.Directive is { IsAsk: true } ask)
+                {
+                    if (ask.IsAskBegin)
+                    {
+                        answer = await AskAsync(pendingPrompt ?? "Continue?", line, token).ConfigureAwait(false);
+                        pendingPrompt = null;
+                        skipping = answer == false;
+                    }
+                    else if (ask.IsAskElse)
+                    {
+                        // Also when started inside the Yes branch (no answer): only one branch ever runs.
+                        skipping = answer != false;
+                    }
+                    else
+                    {
+                        (answer, skipping) = (null, false);
+                    }
+
+                    continue;
+                }
+
+                // The branch the operator did not choose is never sent.
+                if (skipping)
+                {
+                    continue;
+                }
+
                 if (block.Comments.Count > 0 && block.Directive is null)
                 {
                     pendingPrompt = block.Comments[^1];
@@ -412,18 +489,52 @@ public sealed class JobStreamer : IDisposable
     private async Task QueryOffsetsAsync(CancellationToken token) =>
         await SendAsync(new SentLine(0, false, null, true), "$#", token).ConfigureAwait(false);
 
+    /// <summary>Waits until the planner has drained (G4 P0 acknowledged): the machine stands still.</summary>
+    private async Task DrainAsync(CancellationToken token)
+    {
+        var sync = await SendAsync(new SentLine(0, false, null, false), "G4P0", token).ConfigureAwait(false);
+        await Task.WhenAny(sync.Completion, faulted.Task).WaitAsync(token).ConfigureAwait(false);
+        token.ThrowIfCancellationRequested();
+        if (!sync.Completion.IsCompletedSuccessfully || !sync.Completion.Result.IsOk)
+        {
+            throw new OperationCanceledException();
+        }
+    }
+
+    /// <summary>Asks the operator a Yes/No question with the machine standing still; a cancelled question stops the job.</summary>
+    private async Task<bool> AskAsync(string question, int line, CancellationToken token)
+    {
+        await DrainAsync(token).ConfigureAwait(false);
+        SetState(JobState.ProgramPaused, "Question: " + question, JobEventKinds.Prompt);
+        bool? answer;
+        try
+        {
+            answer = await AskOperator!(new JobQuestion(question, line), token).ConfigureAwait(false);
+        }
+        catch (Exception ex) when (ex is not OperationCanceledException and not OutOfMemoryException)
+        {
+            Fault(InterruptionKind.Directive, 0, line, $"Asking the operator failed: {ex.Message}");
+            throw new OperationCanceledException("Asking the operator failed.", ex);
+        }
+
+        if (answer is not { } yes)
+        {
+            await StopAsync().ConfigureAwait(false);
+            throw new OperationCanceledException("Stopped by the operator.");
+        }
+
+        token.ThrowIfCancellationRequested();
+        AddEvent(JobEventKinds.Prompt, line, $"Answered {(yes ? "Yes" : "No")}: {question}", flush: true);
+        SetState(JobState.Running, "Continuing");
+        return yes;
+    }
+
     private async Task RunDirectiveAsync(HostDirective directive, int line, CancellationToken token)
     {
         if (directive.Wait)
         {
             // Drain the planner first so the machine is not moving while waiting (e.g. for the hotend to heat).
-            var sync = await SendAsync(new SentLine(0, false, null, false), "G4P0", token).ConfigureAwait(false);
-            await Task.WhenAny(sync.Completion, faulted.Task).WaitAsync(token).ConfigureAwait(false);
-            token.ThrowIfCancellationRequested();
-            if (!sync.Completion.IsCompletedSuccessfully || !sync.Completion.Result.IsOk)
-            {
-                throw new OperationCanceledException();
-            }
+            await DrainAsync(token).ConfigureAwait(false);
         }
 
         AddEvent(JobEventKinds.Directive, line, directive.ToString(), flush: directive.Wait);
@@ -440,7 +551,7 @@ public sealed class JobStreamer : IDisposable
 
     private void OnStatus(object? sender, StatusReport report)
     {
-        string? prompt = null;
+        JobPrompt? prompt = null;
         lock (gate)
         {
             if (progress.State is not (JobState.Running or JobState.Paused or JobState.ProgramPaused))
@@ -453,7 +564,7 @@ public sealed class JobStreamer : IDisposable
                 && inFlight.FirstOrDefault(l => l.PausePrompt is not null) is { } m0 && !ReferenceEquals(m0, prompted))
             {
                 prompted = m0;
-                prompt = m0.PausePrompt;
+                prompt = new JobPrompt(m0.PausePrompt!, m0.FileLine);
             }
 
             var (executed, exact) = EstimateExecuted(report);
@@ -471,7 +582,7 @@ public sealed class JobStreamer : IDisposable
 
         if (prompt is not null)
         {
-            SetState(JobState.ProgramPaused, "Program paused: " + prompt, JobEventKinds.Prompt);
+            SetState(JobState.ProgramPaused, "Program paused: " + prompt.Message, JobEventKinds.Prompt);
             PromptRequested?.Invoke(this, prompt);
         }
     }

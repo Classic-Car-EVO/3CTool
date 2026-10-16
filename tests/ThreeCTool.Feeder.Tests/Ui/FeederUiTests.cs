@@ -155,6 +155,44 @@ public sealed class FeederUiTests
     }
 
     [Fact]
+    public async Task Question_NoButton_RunsTheNoBranch()
+    {
+        await using var feeder = await FeederHarness.StartAsync();
+        string[] lines =
+        [
+            "(3C Tool test job)", "G21 G90 G94 G54", "G0 Z5", "(Probe on the bed at X0 Y0?)",
+            "(MC:ASK BEGIN)", "G0 X10 Y0", "(MC:ASK ELSE)", "G0 X20 Y0", "(MC:ASK END)", "M30",
+        ];
+        await FeederHarness.UploadAsync(feeder.Local, lines, "question.nc");
+
+        await UiSession.RunAsync(async () =>
+        {
+            using var ui = FeederUi.Open(feeder.SocketPath);
+            var vm = ui.ViewModel;
+            await ui.WaitAsync(() => vm.Jobs.Selected is not null && vm.Jobs.CanStartJobs, "job ready to start");
+            await ui.ClickAsync("StartButton");
+            await ui.WaitAsync(() => vm.Confirm is not null, "start confirmation");
+            await ui.ClickAsync("Accept");
+
+            await ui.WaitAsync(() => vm.Prompt is not null, "question");
+            var prompt = vm.Prompt!;
+            Assert.True(prompt.IsChoice);
+            Assert.False(prompt.IsSpindle);
+            Assert.Equal("Question", prompt.Title);
+            Assert.Equal("Yes", prompt.ConfirmText);
+            Assert.Equal("Stop job", prompt.CancelText);
+            Assert.Equal("Probe on the bed at X0 Y0?", prompt.Message);
+
+            await ui.ClickAsync("No");
+            await ui.WaitAsync(() => vm.Feedback is not null, "feedback form");
+            Assert.Equal("Completed", vm.Run.State);
+        });
+
+        var g54 = FeederHarness.G54;
+        TestJobs.AssertPosition([g54[0] + 20, g54[1], g54[2] + 5], feeder.Simulator.MachinePosition);
+    }
+
+    [Fact]
     public async Task PauseResumeStop_ThenDiscardTheRecovery()
     {
         await using var feeder = await FeederHarness.StartAsync(new SimulatorOptions { TimeScale = 20 });
@@ -257,6 +295,42 @@ public sealed class FeederUiTests
             await ui.WaitAsync(() => jog.Work.X == "0.000" && jog.Work.Y == "0.000", "work zero set");
             Assert.Equal(feeder.Simulator.MachinePosition[0], feeder.Simulator.WorkOffset(0)[0], 3);
         });
+    }
+
+    [Fact]
+    public async Task Setup_MaintenanceButtons_RequestRebootAfterConfirmation()
+    {
+        var folder = Directory.CreateTempSubdirectory("3cf-maint-").FullName;
+        try
+        {
+            await using var feeder = await FeederHarness.StartAsync(home: false, configure: o => o.MaintenanceDirectory = folder);
+
+            await UiSession.RunAsync(async () =>
+            {
+                using var ui = FeederUi.Open(feeder.SocketPath);
+                var vm = ui.ViewModel;
+                await ui.WaitAsync(() => vm.Setup.MaintenanceAvailable, "maintenance available");
+                vm.ShowTab(FeederTab.Setup);
+                await ui.FindAsync<Button>("ConsoleButton");
+                await ui.FindAsync<Button>("PowerOffButton");
+
+                await ui.ClickAsync("RebootButton");
+                await ui.WaitAsync(() => vm.Confirm is { Danger: true }, "reboot confirmation");
+                vm.Confirm!.Cancel();
+                await ui.WaitAsync(() => vm.Confirm is null, "confirmation closed");
+                Assert.Empty(Directory.GetFiles(folder));
+
+                await ui.ClickAsync("RebootButton");
+                await ui.WaitAsync(() => vm.Confirm is not null, "reboot confirmation");
+                vm.Confirm!.Accept();
+                await ui.WaitAsync(() => vm.Message == "Rebooting...", "reboot requested");
+                Assert.True(File.Exists(Path.Combine(folder, "reboot.request")));
+            });
+        }
+        finally
+        {
+            Directory.Delete(folder, true);
+        }
     }
 
     [Fact]

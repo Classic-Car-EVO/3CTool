@@ -35,13 +35,17 @@ public sealed class PostException : Exception
 /// <summary>One operation of the file: its toolpath, resolved cutting conditions and (optionally) its simulated timing.</summary>
 public sealed record PostOperation(Operation Operation, Toolpath Toolpath, CuttingConditions Conditions, StepSummary? Summary = null);
 
-/// <summary>Where the touch plate is placed: WCS X/Y and the WCS Z of the surface it lies on.</summary>
-public readonly record struct TouchPlateSpot(double X, double Y, double SurfaceZ)
+/// <summary>
+/// Where the touch plate is placed: WCS X/Y and the WCS Z of the material surface it lies on. <paramref name="BedZ"/> is
+/// the WCS Z of the bed at X0 Y0 (the stock bottom), offered to the operator as the alternative spot; null when there
+/// is none (rotary setups).
+/// </summary>
+public readonly record struct TouchPlateSpot(double X, double Y, double SurfaceZ, double? BedZ = null)
 {
     /// <summary>
-    /// Centre of the stock top in the WCS of <paramref name="frame"/> (stock bounds in the part frame). Rotary setups
-    /// use the top of the stock straight above the axis at the setup's A; <paramref name="stockRadius"/> is used for
-    /// cylindrical stock.
+    /// Centre of the stock top in the WCS of <paramref name="frame"/> (stock bounds in the part frame), with the stock
+    /// bottom as the bed Z. Rotary setups use the top of the stock straight above the axis at the setup's A and have no
+    /// bed spot; <paramref name="stockRadius"/> is used for cylindrical stock.
     /// </summary>
     public static TouchPlateSpot FromStockBounds(SetupFrame frame, BoundingBox stockBounds, double? stockRadius = null)
     {
@@ -58,7 +62,8 @@ public readonly record struct TouchPlateSpot(double X, double Y, double SurfaceZ
             return new(
                 0.5 * (corners.Min(c => c.X) + corners.Max(c => c.X)),
                 0.5 * (corners.Min(c => c.Y) + corners.Max(c => c.Y)),
-                corners.Max(c => c.Z));
+                corners.Max(c => c.Z),
+                corners.Min(c => c.Z));
         }
 
         if (stockRadius is { } radius)
@@ -98,7 +103,7 @@ public sealed class MillingPostRequest
     /// <summary>Operations in execution order; all use <see cref="Tool"/>.</summary>
     public required IReadOnlyList<PostOperation> Operations { get; init; }
 
-    /// <summary>First file of the setup: sets the work Z (touch plate) and, for the tool-setter method, the reference.</summary>
+    /// <summary>First file of the setup: stops to mount the stock piece or turn the stock first.</summary>
     public bool FirstInSetup { get; init; }
 
     /// <summary>Position of the file within the setup (1-based), used in the file name.</summary>
@@ -113,7 +118,7 @@ public sealed class MillingPostRequest
     /// <summary>Machine position of the WCS origin at A = 0, when known; enables absolute travel checks.</summary>
     public System.Numerics.Vector3? WorkOffset { get; init; }
 
-    /// <summary>Touch plate placement (WCS). Required when the file probes with the touch plate.</summary>
+    /// <summary>Touch plate placement (WCS). Required: every file sets the work Z with the touch plate.</summary>
     public TouchPlateSpot? TouchPlate { get; init; }
 
     /// <summary>Simulation result. Without it, or with errors of this file, output is refused unless overridden.</summary>

@@ -200,7 +200,7 @@ public sealed class JobManager : IHostedService, IDisposable
             }
 
             var runId = Guid.CreateVersion7().ToString("N");
-            var streamer = new JobStreamer(connection, file, journal, runId, StreamerOptions(identity));
+            var streamer = new JobStreamer(connection, file, journal, runId, StreamerOptions(identity)) { AskOperator = AskOperatorAsync };
             var problems = streamer.Validate();
             if (problems.Count > 0)
             {
@@ -267,7 +267,7 @@ public sealed class JobManager : IHostedService, IDisposable
         return streamer.State switch
         {
             JobState.Paused => streamer.ResumeAsync(),
-            JobState.ProgramPaused => throw new FeederStateException("The program is paused at an M0: confirm the prompt on the feeder."),
+            JobState.ProgramPaused => throw new FeederStateException("The program is waiting for the operator: answer the prompt on the feeder."),
             _ => throw new FeederStateException("The job is not paused."),
         };
     }
@@ -570,9 +570,8 @@ public sealed class JobManager : IHostedService, IDisposable
                 return;
             }
 
-            var streamer = new JobStreamer(connection, context.File, journal, context.Row.Id, StreamerOptions(identity));
+            var streamer = new JobStreamer(connection, context.File, journal, context.Row.Id, StreamerOptions(identity)) { AskOperator = AskOperatorAsync };
             context.Recovering = false;
-            context.LastPromptLine = resume.Line - 1;
             context.Row = context.Row with { EndedAt = null, State = nameof(JobState.Running), Recoverable = false };
             database.UpdateRun(context.Row);
             Begin(context, streamer, resume.Line, resume.FirstLinePrefix);
@@ -621,7 +620,7 @@ public sealed class JobManager : IHostedService, IDisposable
         context.Streamer = streamer;
         context.PromptCancellation = new CancellationTokenSource();
         streamer.StateChanged += (_, state) => OnStreamerState(context, state);
-        streamer.PromptRequested += (_, message) => OnProgramPause(context, streamer, message);
+        streamer.PromptRequested += (_, prompt) => OnProgramPause(context, streamer, prompt);
         context.Task = Task.Run(async () =>
         {
             JobState final;
@@ -681,21 +680,22 @@ public sealed class JobManager : IHostedService, IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnProgramPause(RunContext context, JobStreamer streamer, string message)
+    /// <summary>Yes/No question from the program, answered on the touch screen; cancelling stops the job.</summary>
+    private async Task<bool?> AskOperatorAsync(JobQuestion question, CancellationToken cancellationToken)
     {
-        var lastSent = streamer.Progress.LastSent;
-        var line = context.Analysis.PauseLines.FirstOrDefault(l => l > context.LastPromptLine && l <= lastSent);
-        if (line == 0)
-        {
-            line = lastSent;
-        }
+        var prompt = new Prompt { Kind = PromptKind.Choice, Message = question.Text, CanCancel = true, Line = question.Line };
+        var answer = await prompts.AskAsync(prompt, cancellationToken).ConfigureAwait(false);
+        return answer.Confirmed ? answer.Choice : null;
+    }
 
-        context.LastPromptLine = line;
+    private void OnProgramPause(RunContext context, JobStreamer streamer, JobPrompt pause)
+    {
+        var line = pause.Line;
         var spindle = context.Analysis.SpindlePrompts.TryGetValue(line, out var rpm);
         var prompt = new Prompt
         {
             Kind = spindle ? PromptKind.Spindle : PromptKind.ProgramPause,
-            Message = message,
+            Message = pause.Message,
             SuggestedRpm = spindle ? rpm : 0,
             CanCancel = true,
             Line = line,
@@ -834,8 +834,6 @@ public sealed class JobManager : IHostedService, IDisposable
         public volatile bool Recovering;
 
         public volatile string? Message;
-
-        public int LastPromptLine { get; set; }
 
         public CancellationTokenSource RecoveryCancellation { get; } = new();
 

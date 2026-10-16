@@ -101,7 +101,7 @@ internal static class PostFixture
             Operations = [new PostOperation(operation, toolpath, conditions, summary)],
             FirstInSetup = first,
             WorkOffset = workOffset,
-            TouchPlate = touchPlate ?? new TouchPlateSpot(20, 15, 0),
+            TouchPlate = touchPlate ?? new TouchPlateSpot(20, 15, 0, setup.Orientation == SetupOrientation.ThreeAxis ? -20 : null),
             Verification = verification ?? (verified ? new VerificationReport() : null),
             OverrideVerification = overrideVerification,
             InputHashes = new Dictionary<string, string> { ["toolpaths"] = "abc" },

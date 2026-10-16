@@ -164,6 +164,47 @@ public sealed class JobLifecycleTests
         Assert.True(end.RecoveryAvailable);
     }
 
+    [Theory]
+    [InlineData(true, 10)]
+    [InlineData(false, 20)]
+    public async Task Question_AnsweredAtTheMachine_RunsOnlyTheChosenBranch(bool yes, double x)
+    {
+        await using var feeder = await FeederHarness.StartAsync();
+        string[] lines =
+        [
+            "(3C Tool test job)", "G21 G90 G94 G54", "G0 Z5", "(Go to X10?)",
+            "(MC:ASK BEGIN)", "G0 X10 Y0", "(MC:ASK ELSE)", "G0 X20 Y0", "(MC:ASK END)", "M30",
+        ];
+        var job = await FeederHarness.UploadAsync(feeder.Local, lines);
+        var reply = await feeder.Local.StartJobAsync(new StartJobRequest { JobId = job.JobId });
+
+        var asked = await feeder.WaitStatusAsync(s => s.Prompt is not null);
+        Assert.Equal(PromptKind.Choice, asked.Prompt.Kind);
+        Assert.Equal("Go to X10?", asked.Prompt.Message);
+        Assert.Equal(5, asked.Prompt.Line);
+        Assert.True(asked.Prompt.CanCancel);
+        Assert.Equal("ProgramPaused", asked.Job.State);
+
+        var end = await feeder.RunToEndAsync(reply.RunId, p => new PromptAnswer { Id = p.Id, Confirmed = true, Choice = yes });
+        Assert.Equal("Completed", end.Job.State);
+        var g54 = FeederHarness.G54;
+        TestJobs.AssertPosition([g54[0] + x, g54[1], g54[2] + 5], feeder.Simulator.MachinePosition);
+    }
+
+    [Fact]
+    public async Task Question_Cancelled_StopsTheRun()
+    {
+        await using var feeder = await FeederHarness.StartAsync();
+        string[] lines = ["G21 G90 G94 G54", "G0 Z5", "(Go to X10?)", "(MC:ASK BEGIN)", "G0 X10 Y0", "(MC:ASK END)", "M30"];
+        var job = await FeederHarness.UploadAsync(feeder.Local, lines);
+        var reply = await feeder.Local.StartJobAsync(new StartJobRequest { JobId = job.JobId });
+
+        var end = await feeder.RunToEndAsync(reply.RunId, p => new PromptAnswer { Id = p.Id, Confirmed = false });
+        Assert.Equal("Stopped", end.Job.State);
+        var g54 = FeederHarness.G54;
+        Assert.NotEqual(g54[0] + 10, feeder.Simulator.MachinePosition[0], 3);
+    }
+
     [Fact]
     public async Task PauseResumeAndFeedOverride_AreRecorded()
     {

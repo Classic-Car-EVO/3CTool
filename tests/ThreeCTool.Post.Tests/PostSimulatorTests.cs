@@ -17,10 +17,10 @@ public sealed class PostSimulatorTests : IAsyncDisposable
 {
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(60);
 
-    /// <summary>Tool tip Z (physical machine coordinates) of the touch plate top and of the tool setter.</summary>
+    /// <summary>Tool tip Z (physical machine coordinates) of the touch plate top on the material and on the bed.</summary>
     private const double PlateTop = -400;
 
-    private const double SetterTop = -500;
+    private const double BedPlateTop = -430;
 
     private readonly string folder = Path.Combine(Path.GetTempPath(), "3ctool-post-" + Guid.NewGuid().ToString("N"));
     private readonly Simulator simulator;
@@ -34,100 +34,70 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         simulator = new Simulator(new SimulatorOptions
         {
             TimeScale = 100,
-            ProbeSurfaceAt = (x, y) => Math.Abs(x - 50) < 5 && Math.Abs(y - 50) < 5 ? SetterTop : PlateTop,
+
+            // WCS X0 Y0 is machine X100 Y100.
+            ProbeSurfaceAt = (x, y) => Math.Abs(x - 100) < 5 && Math.Abs(y - 100) < 5 ? BedPlateTop : PlateTop,
         });
         server = new TcpSimulatorServer(simulator);
     }
 
     [Fact]
-    public async Task ToolSetterSetup_SecondToolCutsAtTheSameWorkZ()
+    public async Task TouchPlateOnTheMaterial_EveryFileSetsTheWorkZ()
     {
         // The touch plate (10 mm) lies on the stock top at WCS Z 0, so WCS Z 0 must end up at tool tip Z −410.
         await HomeAsync();
         var machine = Machine();
-        var setup = PostFixture.Setup(method: ProbeMethod.ToolSetter);
+        var setup = PostFixture.Setup(workOffset: Core.Projects.WorkOffset.G55);
         var post = new FluidNcMillingPost();
 
-        simulator.ToolLength = 40;
-        var first = post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T1"), machine, first: true));
-        var prompts = await RunAsync(first, "first.nc");
-        Assert.Equal(PlateTop - 10, WorkZeroTip(40), 2);
-        Assert.Equal(0, simulator.ToolLengthOffset, 2);
-        Assert.Equal(SetterTop + 40, simulator.WorkOffset(5)[2], 2);
+        simulator.ToolLength = 30;
+        var (prompts, questions) = await RunAsync(post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T1"), machine)), "first.nc", yes: false);
+        Assert.Equal(PlateTop - 10, simulator.WorkOffset(1)[2] - 30, 2);
         Assert.Equal(
             [
                 "Insert tool T1 in collet ER11 6, stickout 20 mm, set the spindle dial to 18000 RPM",
-                "Place the touch plate on the stock under the tool, at most 600 mm below it, and attach the probe clip",
+                "Place the touch plate on the material at X20 Y15 under the tool, at most 600 mm below it, and attach the probe clip",
                 "Remove the touch plate and the probe clip",
                 "Start the spindle: confirm it runs at 18000 RPM",
             ],
             prompts);
-
-        simulator.ToolLength = 55;
-        var second = post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T2"), machine, first: false));
-        prompts = await RunAsync(second, "second.nc");
-        Assert.Equal(15, simulator.ToolLengthOffset, 2);
-        Assert.Equal(PlateTop - 10, WorkZeroTip(55), 2);
-        Assert.Equal(2, prompts.Count);
-        Assert.Equal(1 + 2 + 1, simulator.ProbeCount / 2);
-    }
-
-    [Fact]
-    public async Task TouchPlateSetup_EveryFileSetsTheWorkZ()
-    {
-        await HomeAsync();
-        var machine = Machine();
-        var setup = PostFixture.Setup(method: ProbeMethod.TouchPlate, workOffset: Core.Projects.WorkOffset.G55);
-        var post = new FluidNcMillingPost();
-
-        simulator.ToolLength = 30;
-        await RunAsync(post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T1"), machine)), "first.nc");
-        Assert.Equal(PlateTop - 10, simulator.WorkOffset(1)[2] - 30, 2);
+        Assert.Equal(["Probe the touch plate on the bed at X0 Y0? Yes: plate on the bed at X0 Y0. No: plate on the material at X20 Y15"], questions);
+        Assert.Equal(2, simulator.ProbeCount);
 
         simulator.ToolLength = 70;
-        await RunAsync(post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T2"), machine, first: false)), "second.nc");
+        await RunAsync(post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T2"), machine, first: false)), "second.nc", yes: false);
         Assert.Equal(PlateTop - 10, simulator.WorkOffset(1)[2] - 70, 2);
         Assert.Equal(0, simulator.ToolLengthOffset, 6);
+        Assert.Equal(4, simulator.ProbeCount);
     }
 
     [Fact]
-    public async Task ToolSetterSetup_EmergencyStopMidCut_ReprobesTheSetterAndResumes()
+    public async Task TouchPlateOnTheBed_SetsTheWorkZFromTheStockBottom()
     {
+        // Stock bottom at WCS Z −20 on the bed: the plate on the bed puts WCS Z 0 at 20 − 10 mm above its top.
         await HomeAsync();
-        var machine = Machine();
-        var setup = PostFixture.Setup(method: ProbeMethod.ToolSetter);
-        var post = new FluidNcMillingPost();
-        simulator.ToolLength = 40;
-        await RunAsync(post.Post(PostFixture.Request(Moves(), setup, PostFixture.Tool("T1"), machine, first: true)), "first.nc");
+        simulator.ToolLength = 30;
+        var (prompts, _) = await RunAsync(new FluidNcMillingPost().Post(PostFixture.Request(Moves(), machine: Machine())), "bed.nc", yes: true);
 
-        simulator.ToolLength = 55;
-        var second = post.Post(PostFixture.Request(LongMoves(), setup, PostFixture.Tool("T2"), machine, first: false));
-        var (plan, messages) = await RunInterruptedAsync(second, "second.nc");
-
-        Assert.NotNull(plan.Probe);
-        Assert.Equal("(MC:PROBE BEGIN)", second.Lines[plan.Probe.BeginLine - 1]);
-        Assert.DoesNotContain(messages, m => m.Contains("touch plate", StringComparison.Ordinal));
-        Assert.Equal(15, simulator.ToolLengthOffset, 2);
-        Assert.Equal(PlateTop - 10, WorkZeroTip(55), 2);
-        Assert.Equal(SetterTop + 40, simulator.WorkOffset(5)[2], 2);
-        Assert.Equal(-5, simulator.PhysicalPosition[2], 2);
+        Assert.Equal(BedPlateTop + 10, simulator.WorkOffset(0)[2] - 30, 2);
+        Assert.Contains("Place the touch plate on the bed at X0 Y0 under the tool, at most 600 mm below it, and attach the probe clip", prompts);
+        Assert.DoesNotContain(prompts, p => p.Contains("on the material", StringComparison.Ordinal));
+        Assert.Equal(2, simulator.ProbeCount);
     }
 
     [Fact]
-    public async Task TouchPlateSetup_EmergencyStopMidCut_ReprobesThePlateAndResumes()
+    public async Task TouchPlateSetup_EmergencyStopMidCut_ResumesWithoutReprobing()
     {
         await HomeAsync();
-        var setup = PostFixture.Setup(method: ProbeMethod.TouchPlate, workOffset: Core.Projects.WorkOffset.G55);
+        var setup = PostFixture.Setup(workOffset: Core.Projects.WorkOffset.G55);
         simulator.ToolLength = 30;
         var output = new FluidNcMillingPost().Post(PostFixture.Request(LongMoves(), setup, PostFixture.Tool("T1"), Machine()));
         var (plan, messages) = await RunInterruptedAsync(output, "plate.nc");
 
-        Assert.NotNull(plan.Probe);
-        Assert.Equal("(MC:PROBE BEGIN TOUCHPLATE)", output.Lines[plan.Probe.BeginLine - 1]);
-        Assert.Contains(messages, m => m.Contains("Place the touch plate", StringComparison.Ordinal));
-        Assert.Contains(messages, m => m.Contains("Remove the touch plate", StringComparison.Ordinal));
+        Assert.Null(plan.Probe);
+        Assert.DoesNotContain(messages, m => m.Contains("touch plate", StringComparison.Ordinal));
         Assert.Equal(PlateTop - 10, simulator.WorkOffset(1)[2] - 30, 2);
-        Assert.Equal(4, simulator.ProbeCount);
+        Assert.Equal(2, simulator.ProbeCount);
     }
 
     public async ValueTask DisposeAsync()
@@ -155,9 +125,6 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         var machine = PostFixture.Machine();
         machine.Probe = new ProbeConfig
         {
-            ToolSetterX = 50,
-            ToolSetterY = 50,
-            ToolSetterStartZ = -5,
             MaxDistance = 600,
             SeekFeed = 3000,
             LatchFeed = 100,
@@ -192,9 +159,6 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         return moves;
     }
 
-    /// <summary>Physical tool tip Z when the controller is at work Z 0 in G54.</summary>
-    private double WorkZeroTip(double toolLength) => simulator.WorkOffset(0)[2] + simulator.ToolLengthOffset - toolLength;
-
     private async Task<ControllerConnection> ConnectAsync()
     {
         var connection = new ControllerConnection(
@@ -215,8 +179,8 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         }
     }
 
-    /// <summary>Streams <paramref name="output"/>, confirming every M0 prompt; returns the prompts.</summary>
-    private async Task<List<string>> RunAsync(PostOutput output, string name)
+    /// <summary>Streams <paramref name="output"/>, confirming every M0 prompt and answering the questions; returns both.</summary>
+    private async Task<(List<string> Prompts, List<string> Questions)> RunAsync(PostOutput output, string name, bool yes)
     {
         var path = Path.Combine(folder, name);
         await File.WriteAllTextAsync(path, output.Text);
@@ -227,21 +191,29 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         var connection = connections[0];
         var journal = new SqliteJobJournal(Path.Combine(folder, name + ".db"), TimeSpan.FromMilliseconds(50));
         journals.Add(journal);
-        using var streamer = new JobStreamer(connection, file, journal, name);
+        var questions = new List<string>();
+        using var streamer = new JobStreamer(connection, file, journal, name)
+        {
+            AskOperator = (question, _) =>
+            {
+                questions.Add(question.Text);
+                return Task.FromResult<bool?>(yes);
+            },
+        };
         Assert.Empty(streamer.Validate());
         var prompts = new List<string>();
-        streamer.PromptRequested += (_, message) =>
+        streamer.PromptRequested += (_, prompt) =>
         {
             lock (prompts)
             {
-                prompts.Add(message);
+                prompts.Add(prompt.Message);
             }
 
             _ = Task.Run(streamer.ResumeAsync);
         };
 
         Assert.Equal(JobState.Completed, await streamer.RunAsync().WaitAsync(Timeout));
-        return prompts;
+        return (prompts, questions);
     }
 
     /// <summary>
@@ -258,7 +230,7 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         var operation = output.Lines.ToList().FindIndex(l => l.StartsWith("(Operation:", StringComparison.Ordinal));
         var target = simulator.ExecutedBlocks + output.Lines.Take(operation).Count(l => !l.StartsWith('(')) + 40;
 
-        using (var streamer = new JobStreamer(connections[0], file, journal, name))
+        using (var streamer = new JobStreamer(connections[0], file, journal, name) { AskOperator = Material })
         {
             streamer.PromptRequested += (_, _) => _ = Task.Run(streamer.ResumeAsync);
             var run = streamer.RunAsync();
@@ -275,12 +247,14 @@ public sealed class PostSimulatorTests : IAsyncDisposable
         var confirmations = new Confirmations();
         var resume = await new RecoveryExecutor(connection, file, journal, name, confirmations, options).ExecuteAsync(plan).WaitAsync(Timeout);
         Assert.NotNull(resume);
-        using (var streamer = new JobStreamer(connection, file, journal, name))
+        using (var streamer = new JobStreamer(connection, file, journal, name) { AskOperator = Material })
         {
             Assert.Equal(JobState.Completed, await streamer.RunAsync(resume.Line, resume.FirstLinePrefix).WaitAsync(Timeout));
         }
 
         return (plan, confirmations.Messages);
+
+        static Task<bool?> Material(JobQuestion question, CancellationToken token) => Task.FromResult<bool?>(false);
     }
 
     private sealed class Confirmations : IOperatorInteraction

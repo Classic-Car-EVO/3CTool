@@ -58,7 +58,10 @@ public sealed class RecoveryOptions
     internal double Margin => SafetyMarginMm ?? (Process == JobProcess.Milling ? 1.0 : 0.0);
 }
 
-/// <summary>Probe routine in the file (between <c>(MC:PROBE BEGIN)</c> and <c>(MC:PROBE END)</c>) replayed to restore tool length.</summary>
+/// <summary>
+/// Tool-length probe routine in the file (between <c>(MC:PROBE BEGIN)</c> and <c>(MC:PROBE END)</c>) replayed to restore
+/// the tool length offset. Touch plate routines (<c>(MC:PROBE BEGIN TOUCHPLATE)</c>) are not replayed.
+/// </summary>
 public sealed record ProbeReplay(int BeginLine, int EndLine, ModalState StateBefore);
 
 public sealed record RecoveryPlan(
@@ -106,8 +109,9 @@ public static class RecoveryPlanner
         var interpreter = new GcodeInterpreter(options.RotaryRadiusMm);
         var segments = new List<MotionSegment>();
         var barriers = new SortedSet<int>();
-        var probeBlocks = new List<(int Begin, int End)>();
+        var probeBlocks = new List<(int Begin, int End, bool TouchPlate)>();
         var probeBegin = 0;
+        var touchPlate = false;
         foreach (var (line, text) in file.ReadLines())
         {
             if (line > lastLine)
@@ -121,13 +125,14 @@ public static class RecoveryPlanner
                 barriers.Add(line);
             }
 
-            if (block.Directive is { IsProbeBegin: true })
+            if (block.Directive is { IsProbeBegin: true } begin)
             {
                 probeBegin = line;
+                touchPlate = begin.Arguments is [_, "TOUCHPLATE", ..];
             }
             else if (block.Directive is { IsProbeEnd: true } && probeBegin > 0)
             {
-                probeBlocks.Add((probeBegin, line));
+                probeBlocks.Add((probeBegin, line, touchPlate));
                 probeBegin = 0;
             }
 
@@ -144,7 +149,7 @@ public static class RecoveryPlanner
         var inside = probeBlocks.FirstOrDefault(b => b.Begin < resume && resume <= b.End);
         if (inside.Begin == 0 && probeBegin > 0 && probeBegin < resume)
         {
-            inside = (probeBegin, int.MaxValue);
+            inside = (probeBegin, int.MaxValue, touchPlate);
         }
 
         if (inside.Begin > 0)
@@ -153,7 +158,14 @@ public static class RecoveryPlanner
             notes.Add($"Interrupted inside the probe routine; resuming at its start (line {resume}).");
         }
 
+        // A touch plate sets the work Z, which is restored from the recorded offsets: it is not probed again (the
+        // material at the probe spot may have been cut away).
         var replayBlock = probeBlocks.LastOrDefault(b => b.End < resume);
+        if (replayBlock.TouchPlate)
+        {
+            notes.Add($"The work Z set by the touch plate (lines {replayBlock.Begin}-{replayBlock.End}) is restored from the recorded work offsets.");
+            replayBlock = default;
+        }
 
         // Pass 2: modal state before the resume line; advance (never past the interrupted line) until XYZ is known.
         interpreter.Reset();
