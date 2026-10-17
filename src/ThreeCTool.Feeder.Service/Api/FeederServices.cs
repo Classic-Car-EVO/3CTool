@@ -67,16 +67,10 @@ public sealed class FeederService(
         return Task.FromResult(list);
     }
 
-    public override Task<Empty> DeleteJob(JobRef request, ServerCallContext context)
+    public override async Task<Empty> DeleteJob(JobRef request, ServerCallContext context)
     {
-        var running = jobs.IsActive && jobs.Snapshot()?.JobId == request.JobId;
-        if (running || database.LatestRecoverableRun()?.JobId == request.JobId)
-        {
-            throw new FeederStateException("The job is running or has a run that can still be recovered.");
-        }
-
-        store.Delete(request.JobId);
-        return Task.FromResult(None);
+        await jobs.DeleteJobAsync(request.JobId, context.CancellationToken).ConfigureAwait(false);
+        return None;
     }
 
     public override Task<Preview> GetPreview(JobRef request, ServerCallContext context) => store.GetPreviewAsync(request.JobId, context.CancellationToken);
@@ -285,6 +279,7 @@ public sealed class FeederService(
         UploadedAt = ProtoConvert.ToTimestamp(job.UploadedAt),
         LastRunState = lastRun?.State ?? string.Empty,
         LastRunAt = ProtoConvert.ToTimestamp(lastRun?.StartedAt),
+        Recoverable = lastRun?.Recoverable ?? false,
     };
 
     private static async IAsyncEnumerable<ByteString> Data(IAsyncStreamReader<UploadChunk> reader, [EnumeratorCancellation] CancellationToken cancellationToken)

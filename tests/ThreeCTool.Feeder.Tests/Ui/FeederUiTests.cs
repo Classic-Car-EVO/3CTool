@@ -229,6 +229,15 @@ public sealed class FeederUiTests
             Assert.False(vm.IsRunning);
             Assert.Null(vm.Feedback);
 
+            // The job can be deleted, with a warning that the recovery is lost.
+            Assert.True(vm.Jobs.DeleteCommand.CanExecute(null));
+            var delete = vm.Jobs.DeleteCommand.ExecuteAsync(null);
+            await ui.WaitAsync(() => vm.Confirm is { Danger: true }, "delete confirmation");
+            Assert.Contains("can then no longer be recovered", vm.Confirm!.Message, StringComparison.Ordinal);
+            vm.Confirm.Cancel();
+            await delete;
+            Assert.Single(vm.Jobs.Jobs);
+
             await ui.ClickAsync("RecoverButton");
             await ui.WaitAsync(() => vm.Recovery is not null, "recovery wizard");
             Assert.True(vm.Recovery!.Available);

@@ -192,6 +192,8 @@ message JobInfo {
   google.protobuf.Timestamp uploaded_at = 4;
   string last_run_state = 5;
   google.protobuf.Timestamp last_run_at = 6;
+  // The last run was interrupted and can still be recovered.
+  bool recoverable = 7;
 }
 
 message JobList {

@@ -385,6 +385,36 @@ public sealed class JobManager : IHostedService, IDisposable
         RefreshFlags();
     }
 
+    /// <summary>Deletes a job that is not running; a run of it that could still be recovered is discarded.</summary>
+    public async Task DeleteJobAsync(string jobId, CancellationToken cancellationToken)
+    {
+        await startGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            store.Get(jobId);
+            lock (gate)
+            {
+                if (active?.Row.JobId == jobId)
+                {
+                    throw new FeederStateException("The job is running; stop it before deleting it.");
+                }
+            }
+
+            if (database.LatestRecoverableRun() is { } run && run.JobId == jobId)
+            {
+                database.UpdateRun(run with { Recoverable = false, FeedbackPending = true });
+                journal.AddEvent(run.Id, new JobEvent(time.GetUtcNow(), JobEventKinds.Recovery, null, "Recovery discarded: the job was deleted"), flush: true);
+            }
+
+            store.Delete(jobId);
+            RefreshFlags();
+        }
+        finally
+        {
+            startGate.Release();
+        }
+    }
+
     public ActiveJob? Snapshot()
     {
         RunContext? context;
