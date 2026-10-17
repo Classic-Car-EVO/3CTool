@@ -118,11 +118,6 @@ public sealed class SettingsStore
             throw new ArgumentException("TCP port must be 1..65535.");
         }
 
-        if (settings.SafeZMachine > 0)
-        {
-            throw new ArgumentException("Safe Z is a machine coordinate and must be at or below 0 (FluidNC homes Z at the top).");
-        }
-
         if (!double.IsFinite(settings.SafeZMachine) || !double.IsFinite(settings.TouchPlateThickness) || settings.TouchPlateThickness > 100
             || settings.ProbeMaxTravel > 500 || settings.ProbeFeed > 2000 || settings.PlungeFeed > 5000 || settings.RecoveryMarginMm > 50)
         {

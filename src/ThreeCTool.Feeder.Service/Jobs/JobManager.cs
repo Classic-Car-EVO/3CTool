@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using ThreeCTool.Core.Machines;
 using ThreeCTool.Feeder.Contracts;
 using ThreeCTool.Feeder.Service.Controller;
 using ThreeCTool.Feeder.Service.Security;
@@ -358,6 +359,16 @@ public sealed class JobManager : IHostedService, IDisposable
                 throw new FeederStateException($"The run cannot be resumed ({plan.Action}): {string.Join(" ", plan.Notes)}");
             }
 
+            // The recovery moves use the safe Z too: check it and the file before anything moves.
+            using (var check = new JobStreamer(connection, file, journal, run.Id, StreamerOptions(identity)) { AskOperator = AskOperatorAsync })
+            {
+                var problems = check.Validate();
+                if (problems.Count > 0)
+                {
+                    throw new FeederStateException("The job cannot be resumed: " + string.Join(" ", problems.Take(5)));
+                }
+            }
+
             var job = store.Get(run.JobId);
             var analysis = await store.GetAnalysisAsync(run.JobId, cancellationToken).ConfigureAwait(false);
             var context = new RunContext(run, job, file, analysis) { Recovering = true };
@@ -551,12 +562,19 @@ public sealed class JobManager : IHostedService, IDisposable
         startGate.Dispose();
     }
 
-    private JobStreamerOptions StreamerOptions(ControllerIdentity identity) => new()
+    private JobStreamerOptions StreamerOptions(ControllerIdentity identity)
     {
-        UseLineNumbers = identity.Config?.UseLineNumbers ?? false,
-        PlannerBlocks = identity.PlannerBlocks,
-        SafeZMachine = settings.Current.SafeZMachine,
-    };
+        // The low end of the Z travel is the collet nut on the table.
+        var travel = identity.Config?.Axes().FirstOrDefault(a => a.Axis == AxisName.Z)?.Travel();
+        return new()
+        {
+            UseLineNumbers = identity.Config?.UseLineNumbers ?? false,
+            PlannerBlocks = identity.PlannerBlocks,
+            SafeZMachine = settings.Current.SafeZMachine,
+            MachineZTravel = travel,
+            TableMachineZ = travel?.Low,
+        };
+    }
 
     private RecoveryOptions RecoveryOptionsFromSettings()
     {

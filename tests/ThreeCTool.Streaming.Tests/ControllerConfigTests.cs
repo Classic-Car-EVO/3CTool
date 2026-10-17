@@ -107,6 +107,31 @@ public sealed class ControllerConfigTests
         Assert.Contains(mismatches, m => m.Axis == null && m.Setting == "planner blocks" && m.ControllerValue == "32");
     }
 
+    [Theory]
+    [InlineData(false, 0, 300, -5, 295)]
+    [InlineData(true, 0, 100, -5, -5)]
+    [InlineData(true, 0, 100, 3, -5)]
+    [InlineData(false, 0, 2, -5, 0)]
+    public void Apply_MovesTheSafeZIntoTheZTravel(bool positive, double mpos, double travel, double safeZ, double expected)
+    {
+        string[] z =
+        [
+            "  z:",
+            "    max_travel_mm: " + travel.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "    homing:",
+            "      positive_direction: " + (positive ? "true" : "false"),
+            "      mpos_mm: " + mpos.ToString(System.Globalization.CultureInfo.InvariantCulture),
+            "    motor0:",
+            "      null_motor:",
+        ];
+        var config = ControllerConfig.Parse([.. Yaml[..^1], .. z, "ok"]);
+        var profile = new MachineProfile { Name = "test", SafeZMachine = safeZ };
+
+        ProfileImport.Apply(profile, config, null, DateTimeOffset.UnixEpoch);
+
+        Assert.Equal(expected, profile.SafeZMachine, 9);
+    }
+
     [Fact]
     public async Task IdentifyAsync_AgainstSimulator_MatchesImportedProfile()
     {

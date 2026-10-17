@@ -5,12 +5,14 @@ public sealed class MotionSegment
 {
     private const int DistanceSamples = 32;
 
-    internal MotionSegment(int line, MotionMode mode, double[] start, double[] end, bool[] machineAxes, int plane, double[]? center, double sweep, double rotaryRadius)
+    internal MotionSegment(int line, MotionMode mode, double[] start, double[] end, bool[] machineAxes, int plane, double[]? center, double sweep, double rotaryRadius,
+        double[]? programmedEnd = null)
     {
         Line = line;
         Mode = mode;
         Start = start;
         End = end;
+        ProgrammedEnd = programmedEnd ?? end;
         MachineAxes = machineAxes;
         Plane = plane;
         Center = center;
@@ -25,6 +27,9 @@ public sealed class MotionSegment
     public IReadOnlyList<double> Start { get; }
 
     public IReadOnlyList<double> End { get; }
+
+    /// <summary>The programmed target: <see cref="End"/>, except for probe moves, which stop at contact (End is unknown).</summary>
+    public IReadOnlyList<double> ProgrammedEnd { get; }
 
     public IReadOnlyList<bool> MachineAxes { get; }
 

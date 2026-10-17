@@ -32,6 +32,7 @@ public sealed class FluidNcMillingPostTests
             "(Estimated time: 00:02:05)",
             "(Generator: 3C Tool 9.9.9)",
             "(Input toolpaths: abc)",
+            "(MC:TOOL STICKOUT 20)",
             "G21 G90 G94 G17 G91.1 G54",
             "G53 G0 Z-5",
             "M5 M9",
@@ -400,7 +401,8 @@ public sealed class FluidNcMillingPostTests
         machine.Probe.MaxDistance = 1000;
         var lines = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), machine: machine)).Lines;
 
-        Assert.Equal(2, lines.Count(l => l == "G91 G38.2 Z-645 F200"));
+        // Down to the table, less the 20 mm stickout.
+        Assert.Equal(2, lines.Count(l => l == "G91 G38.2 Z-625 F200"));
     }
 
     [Fact]
@@ -443,15 +445,27 @@ public sealed class FluidNcMillingPostTests
         Assert.Equal(0, spot.X, 9);
         Assert.Equal(0, spot.Y, 9);
         Assert.Equal(40, spot.SurfaceZ, 9);
-        Assert.Equal(-20, spot.BedZ!.Value, 9);
+        Assert.Null(spot.BedZ);
     }
 
     [Fact]
     public void FromStockBounds_ThreeAxis_IsTheStockTopCentre()
     {
+        // The origin X0 Y0 lies on the stock, so the bed there is not reachable for the touch plate.
         var frame = new SetupFrame(SetupOrientation.ThreeAxis, 10, 20, 30, 0);
         var spot = TouchPlateSpot.FromStockBounds(frame, new Geometry.BoundingBox(new Vector3(0, 0, 0), new Vector3(100, 60, 40)));
-        Assert.Equal(new TouchPlateSpot(40, 10, 10, -30), spot);
+        Assert.Equal(new TouchPlateSpot(40, 10, 10), spot);
+    }
+
+    [Fact]
+    public void FromStockBounds_OriginOffTheStock_OffersTheBedOnlyWithClearance()
+    {
+        // The origin is 20 mm left of and 10 mm in front of the stock: 22.4 mm from its footprint.
+        var frame = new SetupFrame(SetupOrientation.ThreeAxis, -20, -10, 40, 0);
+        var bounds = new Geometry.BoundingBox(new Vector3(0, 0, 0), new Vector3(100, 60, 40));
+
+        Assert.Equal(new TouchPlateSpot(70, 40, 0, -40), TouchPlateSpot.FromStockBounds(frame, bounds, clearance: 20));
+        Assert.Null(TouchPlateSpot.FromStockBounds(frame, bounds, clearance: 25).BedZ);
     }
 
     [Fact]

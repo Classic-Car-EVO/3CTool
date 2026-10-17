@@ -21,9 +21,15 @@ public sealed record ControllerIdentity(
 /// <summary>Imports controller-owned settings into a machine profile and detects drift (section 11.1a).</summary>
 public static class ProfileImport
 {
+    /// <summary>Distance (mm) below the top of the Z travel for a safe Z set by <see cref="Apply"/>.</summary>
+    public const double SafeZBelowTop = 5;
+
     private const double RelativeTolerance = 1e-6;
 
-    /// <summary>Copies axis settings, version and config hash into <paramref name="profile"/>. 3C Tool-owned settings are untouched.</summary>
+    /// <summary>
+    /// Copies axis settings, version and config hash into <paramref name="profile"/>. 3C Tool-owned settings are untouched,
+    /// except a safe Z outside the imported Z travel, which is moved just below its top.
+    /// </summary>
     public static void Apply(MachineProfile profile, ControllerConfig config, FluidNcVersionInfo? version, DateTimeOffset importedAt)
     {
         ArgumentNullException.ThrowIfNull(profile);
@@ -36,6 +42,11 @@ public static class ProfileImport
         if (version is not null)
         {
             profile.Controller.FluidNcVersion = version.Version.ToString(3);
+        }
+
+        if (profile.GetAxis(AxisName.Z)?.Travel() is { } z && !(profile.SafeZMachine >= z.Low && profile.SafeZMachine <= z.High))
+        {
+            profile.SafeZMachine = Math.Max(z.High - SafeZBelowTop, z.Low);
         }
     }
 

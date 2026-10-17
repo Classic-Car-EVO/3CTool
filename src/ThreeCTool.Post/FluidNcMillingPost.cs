@@ -71,6 +71,8 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
             writer.Comment($"WARNING: {warning}");
         }
 
+        // The feeder keeps the tool tip above the table with this (machine Z of the collet nut on the table + stickout).
+        writer.Comment($"{ToolMarker} STICKOUT {Writer.Format(Math.Max(tool.Stickout, 0))}");
         var wcs = $"G{54 + (int)setup.WorkOffset}";
         writer.Line($"G21 G90 G94 G17 G91.1 {wcs}");
         writer.MachineZ(safeZ);
@@ -206,6 +208,8 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
 
     private const string AskMarker = "MC:ASK";
 
+    private const string ToolMarker = "MC:TOOL";
+
     private static string SetupText(Setup setup, SetupFrame frame) => setup.Orientation switch
     {
         SetupOrientation.Indexed => $"indexed A{Writer.Format(setup.IndexAngle)}",
@@ -256,18 +260,20 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         writer.Forget();
     }
 
-    private static (double Low, double High)? Range(AxisConfig? config) =>
-        config is not { MaxTravel: > 0 }
-            ? null
-            : config.HomingPositiveDirection
-                ? (config.HomingMachinePosition - config.MaxTravel, config.HomingMachinePosition)
-                : (config.HomingMachinePosition, config.HomingMachinePosition + config.MaxTravel);
+    private static (double Low, double High)? Range(AxisConfig? config) => config?.Travel();
 
-    /// <summary>Probe seek distance from <paramref name="startZ"/>, clamped to the Z travel below it.</summary>
+    /// <summary>
+    /// Lowest machine Z of the spindle with this tool: the tool tip on the table. The low end of the Z travel is the
+    /// collet nut on the table; null when the Z travel is not configured.
+    /// </summary>
+    private static double? ToolFloor(MillingPostRequest request) =>
+        Range(request.Machine.GetAxis(AxisName.Z)) is { } z ? z.Low + Math.Max(request.Tool.Stickout, 0) : null;
+
+    /// <summary>Probe seek distance from <paramref name="startZ"/>, clamped so that the tool tip stays above the table.</summary>
     private static double Seek(MillingPostRequest request, double startZ)
     {
         var distance = request.Machine.Probe.MaxDistance;
-        return Range(request.Machine.GetAxis(AxisName.Z)) is { } z ? Math.Min(distance, startZ - z.Low) : distance;
+        return ToolFloor(request) is { } floor ? Math.Min(distance, startZ - floor) : distance;
     }
 
     private static double PlateSeek(MillingPostRequest request) => Seek(request, request.Machine.SafeZMachine);
@@ -485,7 +491,9 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         Check(2, machine.SafeZMachine, "the safe Z");
         if (!(PlateSeek(request) > 2 * probe.Retract))
         {
-            throw new PostException("There is no Z travel left below the safe Z to probe the touch plate.");
+            throw new PostException(ToolFloor(request) is { } floor
+                ? $"At the safe Z (machine Z {Writer.Format(machine.SafeZMachine)}) the tip of the {Writer.Format(request.Tool.Stickout)} mm stickout tool is {Writer.Format(machine.SafeZMachine - floor)} mm above the table: there is no room to probe the touch plate. Raise the safe Z or shorten the stickout."
+                : "There is no Z travel left below the safe Z to probe the touch plate.");
         }
 
         // WCS positions: travel span, and absolute limits when the work offset is known.

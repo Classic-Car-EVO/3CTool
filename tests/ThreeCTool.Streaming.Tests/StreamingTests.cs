@@ -327,6 +327,51 @@ public sealed class StreamingTests
     }
 
     [Fact]
+    public async Task Validate_MachineZOutsideTheTravelOrBelowTheTable_IsReported()
+    {
+        await using var sim = await SimHarness.StartAsync(home: false);
+        var file = await sim.WriteJobAsync(
+        [
+            "(MC:TOOL STICKOUT 20)", "G21 G90 G54", "G53 G0 Z-5", "G0 X10 Y10", "G53 G0 Z5", "G53 G1 Z-90 F100", "G0 Z-500", "G53 X0",
+        ]);
+        var connection = await sim.ConnectAsync();
+        var options = new JobStreamerOptions { SafeZMachine = 3, MachineZTravel = (-100, 0), TableMachineZ = -100 };
+        using var streamer = new JobStreamer(connection, file, sim.OpenJournal(), "job1", options);
+
+        var problems = streamer.Validate();
+
+        Assert.Equal(3, problems.Count);
+        Assert.StartsWith("The safe Z in the feeder settings: machine Z 3", problems[0], StringComparison.Ordinal);
+        Assert.StartsWith("Line 5: machine Z 5", problems[1], StringComparison.Ordinal);
+        Assert.StartsWith("Line 6: machine Z -90", problems[2], StringComparison.Ordinal);
+        Assert.Contains("stickout 20", problems[2], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task RunAsync_WorkMoveBelowTheTable_FaultsBeforeSendingIt()
+    {
+        await using var sim = await SimHarness.StartAsync();
+        var file = await sim.WriteJobAsync(
+        [
+            "(MC:TOOL STICKOUT 20)", "G21 G90", "G10 L2 P1 X0 Y0 Z-600", "G54", "G0 Z-20", "G1 Z-29 F500", "G1 Z-31", "G0 Z0",
+        ]);
+        var setupLines = sim.Simulator.ReceivedLines.Count;
+        var connection = await sim.ConnectAsync();
+        var journal = sim.OpenJournal();
+        var options = new JobStreamerOptions { MachineZTravel = (-650, 0), TableMachineZ = -650 };
+        using var streamer = new JobStreamer(connection, file, journal, "job1", options);
+        Assert.Empty(streamer.Validate());
+
+        Assert.Equal(JobState.Faulted, await streamer.RunAsync().WaitAsync(SimHarness.Timeout));
+
+        var received = sim.Simulator.ReceivedLines.Skip(setupLines).ToList();
+        Assert.Contains("G1Z-29F500", received);
+        Assert.DoesNotContain("G1Z-31", received);
+        Assert.True(sim.Simulator.MachinePosition[2] >= -629 - 1e-6);
+        Assert.Contains(journal.GetEvents("job1"), e => e.Kind == JobEventKinds.Error && e.Line == 7 && e.Message.Contains("stickout 20", StringComparison.Ordinal));
+    }
+
+    [Fact]
     public async Task SetFeedOverrideAsync_ReachesControllerAndJournal()
     {
         await using var sim = await SimHarness.StartAsync(new SimulatorOptions { TimeScale = 20 });

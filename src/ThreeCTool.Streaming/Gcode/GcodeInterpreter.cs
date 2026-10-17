@@ -376,6 +376,7 @@ public sealed class GcodeInterpreter(double rotaryRadiusMm = 20)
             (center, sweep) = ArcCenter(block, start, target, mode == MotionMode.ArcClockwise);
         }
 
+        var programmed = (double[])target.Clone();
         if (mode == MotionMode.Probe)
         {
             foreach (var (axis, _) in words)
@@ -387,7 +388,7 @@ public sealed class GcodeInterpreter(double rotaryRadiusMm = 20)
         target.CopyTo(s.Position, 0);
         machineAxes.CopyTo(s.MachineAxes, 0);
         return new MotionSegment(line, machine && mode != MotionMode.Probe ? (mode == MotionMode.Rapid ? MotionMode.Rapid : MotionMode.Linear) : mode,
-            start, target, machineAxes, s.Plane, center, sweep, rotaryRadiusMm);
+            start, target, machineAxes, s.Plane, center, sweep, rotaryRadiusMm, programmed);
     }
 
     private (double[]? Center, double Sweep) ArcCenter(GcodeBlock block, double[] start, double[] end, bool clockwise)
