@@ -59,6 +59,13 @@ public sealed class OrbitCamera
 
     public Matrix4x4 ViewProjection(float aspect) => View * Projection(aspect);
 
+    public void CopyFrom(OrbitCamera other)
+    {
+        ArgumentNullException.ThrowIfNull(other);
+        (MinDistance, MaxDistance) = (other.MinDistance, other.MaxDistance);
+        (Target, Yaw, Pitch, Distance, FieldOfView) = (other.Target, other.Yaw, other.Pitch, other.Distance, other.FieldOfView);
+    }
+
     public void Orbit(float deltaYaw, float deltaPitch)
     {
         Yaw += deltaYaw;

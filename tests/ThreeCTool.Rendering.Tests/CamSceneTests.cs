@@ -68,6 +68,34 @@ public sealed class CamSceneTests
     }
 
     [Fact]
+    public void Clone_CopiesContentAndCamera_Independently()
+    {
+        var scene = new CamScene();
+        var a = Toolpath("a", 0, 0, 0, 1, 0, 0);
+        scene.SetToolpaths([a]);
+        scene.SetPoints([new ScenePoints(SceneLayer.Simulation, "p", [Vector3.One], [Heatmap.OnSize], 1)]);
+        scene.SelectedToolpath = a.Id;
+        scene.Progress = (0, 1);
+        scene.ShowRapids = false;
+        scene.SetVisible(SceneLayer.Stock, false);
+        scene.Camera.Distance = 123;
+        scene.Camera.Yaw = 0.5f;
+
+        var copy = scene.Clone();
+        Assert.Equal(scene.Toolpaths, copy.Toolpaths);
+        Assert.Equal(scene.Points, copy.Points);
+        Assert.Equal((a.Id, (0, 1), false, false), (copy.SelectedToolpath, copy.Progress, copy.ShowRapids, copy.IsVisible(SceneLayer.Stock)));
+        Assert.Equal(scene.Camera.ViewProjection(1.5f), copy.Camera.ViewProjection(1.5f));
+
+        copy.Camera.Distance = 50;
+        copy.SetPoints([]);
+        copy.SetVisible(SceneLayer.Stock, true);
+        Assert.Equal(123, scene.Camera.Distance);
+        Assert.Single(scene.Points);
+        Assert.False(scene.IsVisible(SceneLayer.Stock));
+    }
+
+    [Fact]
     public void ScenePoints_NeedOneColourPerPoint() =>
         Assert.Throws<ArgumentException>(() => new ScenePoints(SceneLayer.Simulation, "p", [Vector3.Zero, Vector3.One], [Heatmap.OnSize], 1));
 

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Runtime.InteropServices;
 
 using Avalonia.Threading;
 
@@ -51,6 +52,30 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
         new("1000x", 1000),
     ];
 
+    public static IReadOnlyList<Choice<(int Width, int Height)>> VideoSizes { get; } =
+    [
+        new("1280 × 720", (1280, 720)),
+        new("1920 × 1080", (1920, 1080)),
+        new("3840 × 2160", (3840, 2160)),
+    ];
+
+    /// <summary>Video length for the whole job (the finished part is held for another second).</summary>
+    public static IReadOnlyList<Choice<double>> VideoLengths { get; } =
+    [
+        new("15 s", 15),
+        new("30 s", 30),
+        new("1 min", 60),
+        new("2 min", 120),
+        new("5 min", 300),
+    ];
+
+    public static IReadOnlyList<Choice<int>> FrameRates { get; } =
+    [
+        new("24 fps", 24),
+        new("30 fps", 30),
+        new("60 fps", 60),
+    ];
+
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(HasDeviation))]
     public partial bool IsAvailable { get; private set; }
@@ -75,6 +100,26 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
     public partial bool ShowDeviation { get; set; }
 
     public bool HasDeviation => IsAvailable && result?.Report.Deviation is { Samples.Length: > 0 };
+
+    [ObservableProperty]
+    public partial Choice<(int Width, int Height)> VideoSize { get; set; } = VideoSizes[1];
+
+    [ObservableProperty]
+    public partial Choice<double> VideoLength { get; set; } = VideoLengths[2];
+
+    [ObservableProperty]
+    public partial Choice<int> FrameRate { get; set; } = FrameRates[1];
+
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(CanControl))]
+    public partial bool IsExporting { get; private set; }
+
+    /// <summary>The playback controls work (no video export running).</summary>
+    public bool CanControl => !IsExporting;
+
+    /// <summary>Video export progress, 0..100.</summary>
+    [ObservableProperty]
+    public partial double ExportProgress { get; private set; }
 
     /// <summary>The stock and tool currently shown match <see cref="Time"/>.</summary>
     public bool IsSettled => !seeking;
@@ -165,6 +210,137 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
         DisposePlayback();
     }
 
+    /// <summary>
+    /// Records the whole job with the current camera into an MP4 file; false when it failed (the error was shown) or
+    /// was cancelled.
+    /// </summary>
+    public async Task<bool> ExportVideoAsync(string path)
+    {
+        if (!IsAvailable || IsExporting)
+        {
+            return false;
+        }
+
+        Pause();
+        ShowDeviation = false;
+        await SettleAsync();
+        if (pipeline is not { } owner || result is not { } simulation || seeking)
+        {
+            return false;
+        }
+
+        var (width, height) = VideoSize.Value;
+        var fps = FrameRate.Value;
+        var frames = Math.Max(2, (int)Math.Round(VideoLength.Value * fps));
+        var report = simulation.Report;
+        var frame = scene.Clone();
+        var started = version;
+        using var cts = new CancellationTokenSource();
+        var token = cts.Token;
+        running = cts;
+        seeking = true;
+        OnPropertyChanged(nameof(IsSettled));
+        IsExporting = true;
+        ExportProgress = 0;
+        var ok = false;
+        try
+        {
+            ok = await shell.RunAsync(async () =>
+            {
+                await using var writer = await VideoWriter.StartAsync(path, width, height, fps, token);
+                var rasterizer = new SoftwareRasterizer();
+                var pixels = new byte[writer.FrameBytes];
+                for (var k = 0; k < frames; k++)
+                {
+                    var time = report.CycleTime * k / (frames - 1);
+                    var (step, move) = Locate(report, time);
+                    PositionText = Describe(report, step, move, time);
+                    ShowTool(scene, report, step, move);
+                    ShowTool(frame, report, step, move);
+                    var stock = await StockPointsAsync(owner, simulation, step, move, token);
+                    token.ThrowIfCancellationRequested();
+                    scene.SetPoints([stock]);
+                    frame.SetPoints([stock]);
+                    await Task.Run(
+                        () =>
+                        {
+                            rasterizer.Render(frame, width, height);
+                            MemoryMarshal.AsBytes(rasterizer.Pixels).CopyTo(pixels);
+                        },
+                        token);
+
+                    // The finished part stays on screen for another second.
+                    for (var copies = k == frames - 1 ? 1 + fps : 1; copies > 0; copies--)
+                    {
+                        await writer.WriteFrameAsync(pixels, token);
+                    }
+
+                    ExportProgress = 100.0 * (k + 1) / frames;
+                }
+
+                await writer.FinishAsync(token);
+            });
+        }
+        finally
+        {
+            running = null;
+            seeking = false;
+            IsExporting = false;
+            ExportProgress = 0;
+            OnPropertyChanged(nameof(IsSettled));
+            if (disposePending)
+            {
+                DisposePlayback();
+            }
+
+            if (IsAvailable)
+            {
+                // Back to the time shown before (or to a simulation loaded meanwhile).
+                _ = ShowAsync();
+            }
+        }
+
+        if (ok)
+        {
+            shell.ShowMessage($"Saved the video {Path.GetFileName(path)}.");
+        }
+        else if (token.IsCancellationRequested && started == version)
+        {
+            shell.ShowMessage("Video export cancelled.");
+        }
+
+        return ok;
+    }
+
+    [RelayCommand]
+    private async Task ExportVideo()
+    {
+        if (!IsAvailable || IsExporting)
+        {
+            return;
+        }
+
+        if (VideoWriter.FindFfmpeg() is null)
+        {
+            shell.ShowMessage(VideoWriter.NotFoundMessage, isError: true);
+            return;
+        }
+
+        if (await shell.Files.SaveFileAsync("Export the simulation as a video", "simulation.mp4", [new FileType("MP4 video", ["*.mp4"])]) is { } path)
+        {
+            await ExportVideoAsync(path);
+        }
+    }
+
+    [RelayCommand]
+    private void CancelExport()
+    {
+        if (IsExporting)
+        {
+            running?.Cancel();
+        }
+    }
+
     [RelayCommand]
     private void PlayPause()
     {
@@ -174,7 +350,7 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
             return;
         }
 
-        if (!IsAvailable)
+        if (!IsAvailable || IsExporting)
         {
             return;
         }
@@ -243,7 +419,7 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
 
     partial void OnTimeChanged(double value)
     {
-        if (IsAvailable)
+        if (IsAvailable && !IsExporting)
         {
             _ = ShowAsync();
         }
@@ -251,7 +427,7 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
 
     partial void OnShowDeviationChanged(bool value)
     {
-        if (IsAvailable)
+        if (IsAvailable && !IsExporting)
         {
             _ = ShowAsync();
         }
@@ -310,24 +486,9 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
         }
 
         var report = simulation.Report;
-        // At the end of the cycle the finished stock is shown (Locate would give the last move).
-        var (step, move) = (time < report.CycleTime ? report.Locate(time) : null) ?? (report.Steps.Count, 0);
+        var (step, move) = Locate(report, time);
         PositionText = Describe(report, step, move, time);
-        var end = step >= report.Steps.Count;
-        if (end)
-        {
-            scene.Progress = null;
-            scene.Tool = null;
-        }
-        else
-        {
-            scene.Progress = (step, move);
-            scene.Tool = step < steps.Count && tools.FirstOrDefault(t => t.Id == steps[step].Toolpath.ToolId) is { } tool
-                && steps[step].Toolpath.Moves is { Count: > 0 } moves
-                ? SceneBuilder.ToolMarker(steps[step].Toolpath.Frame, moves[Math.Min(move, moves.Count - 1)], tool)
-                : null;
-        }
-
+        ShowTool(scene, report, step, move);
         if (deviation && report.Deviation is { Samples.Length: > 0 } d)
         {
             var range = Math.Max(Math.Max(d.MaxLeftover, d.MaxGouge), 4 * tolerance);
@@ -335,13 +496,40 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
             return;
         }
 
+        var stock = await StockPointsAsync(owner, simulation, step, move, token);
+        token.ThrowIfCancellationRequested();
+        scene.SetPoints([stock]);
+    }
+
+    /// <summary>Step and move at a time; the step count at the end of the cycle (the finished stock).</summary>
+    private static (int Step, int Move) Locate(VerificationReport report, double time) =>
+        (time < report.CycleTime ? report.Locate(time) : null) ?? (report.Steps.Count, 0);
+
+    private void ShowTool(CamScene target, VerificationReport report, int step, int move)
+    {
+        if (step >= report.Steps.Count)
+        {
+            target.Progress = null;
+            target.Tool = null;
+            return;
+        }
+
+        target.Progress = (step, move);
+        target.Tool = step < steps.Count && tools.FirstOrDefault(t => t.Id == steps[step].Toolpath.ToolId) is { } tool
+            && steps[step].Toolpath.Moves is { Count: > 0 } moves
+            ? SceneBuilder.ToolMarker(steps[step].Toolpath.Frame, moves[Math.Min(move, moves.Count - 1)], tool)
+            : null;
+    }
+
+    /// <summary>The in-process stock after a move (the finished stock past the last step).</summary>
+    private async Task<ScenePoints> StockPointsAsync(CamPipeline owner, SimulationResult simulation, int step, int move, CancellationToken token)
+    {
+        var end = step >= simulation.Report.Steps.Count;
         if (end && playback is null)
         {
             // The finished stock is the simulation's own; no playback needed.
             var final = await owner.SurfacePointsAsync(simulation.Stock, token);
-            token.ThrowIfCancellationRequested();
-            scene.SetPoints([SceneBuilder.StockPoints(final, report.Resolution)]);
-            return;
+            return SceneBuilder.StockPoints(final, simulation.Report.Resolution);
         }
 
         if (playback is null)
@@ -358,8 +546,7 @@ public sealed partial class PlaybackViewModel : ObservableObject, IDisposable
 
         await owner.SeekAsync(playback, step, end ? 0 : move, token);
         var points = await owner.SurfacePointsAsync(playback.Stock, token);
-        token.ThrowIfCancellationRequested();
-        scene.SetPoints([SceneBuilder.StockPoints(points, playback.Resolution)]);
+        return SceneBuilder.StockPoints(points, playback.Resolution);
     }
 
     private static string Describe(VerificationReport report, int step, int move, double time)
