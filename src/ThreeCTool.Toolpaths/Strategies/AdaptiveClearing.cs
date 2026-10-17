@@ -20,18 +20,23 @@ internal static class AdaptiveClearing
         var settings = context.Settings;
         var stockTop = (double)context.Setup.StockBounds.Max.Z;
         var top = Math.Min(settings.MaxZ ?? stockTop, stockTop);
-        var levels = context.Levels(top, context.ClearingFloor, settings.Stepdown, flats: true);
+        var levels = context.ClearingLevels(top, context.ClearingFloor, settings.Stepdown);
         var entryTop = stockTop;
         for (var i = 0; i < levels.Count; i++)
         {
-            var z = levels[i];
-            var region = context.ClearingRegion(z);
+            var level = levels[i];
+            var region = context.LevelRegion(level);
             if (region.Count > 0)
             {
-                new AdaptiveLevel(context, builder, region, z, entryTop).Run();
+                new AdaptiveLevel(context, builder, region, level.Z, entryTop).Run();
             }
 
-            entryTop = z;
+            // Outside a flat level's region the material still reaches up to the last even level.
+            if (!level.IsFlat)
+            {
+                entryTop = level.Z;
+            }
+
             context.Report((i + 1.0) / levels.Count);
         }
     }

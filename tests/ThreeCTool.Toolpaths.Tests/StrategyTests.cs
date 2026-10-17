@@ -59,6 +59,28 @@ public sealed class StrategyTests(ComputeFixture fixture, ITestOutputHelper outp
         Assert.Contains(toolpath.Moves, m => m.Kind == MoveKind.Cut && Math.Abs(m.Z - -9.5) < 1e-6);
     }
 
+    [Theory]
+    [InlineData(StrategyType.ZLevelRoughing)]
+    [InlineData(StrategyType.AdaptiveRoughing)]
+    public void Roughing_FlatLevelsOnlyClearAroundTheFlats(StrategyType strategy)
+    {
+        // A pad 0.03 above the base top (WCS −10): both flats are within the 0.05 tolerance, so they share one level.
+        var part = Mesh.Merge([Kit.Stepped(), TestMeshes.Box(new Vector3(8, 8, 5), new Vector3(14, 14, 5.03f))], "padded");
+        var request = Kit.Request(Compute, strategy, Kit.Flat(6), part, SteppedStock);
+        var toolpath = Generate(request);
+        var cuts = toolpath.Moves.Where(m => m.Kind == MoveKind.Cut).ToList();
+
+        AssertGouge(request, toolpath, RoughingAllowance);
+        var flat = cuts.Where(m => Math.Abs(m.Z - -9.47) < 1e-3).ToList();
+        Assert.NotEmpty(flat);
+        Assert.DoesNotContain(cuts, m => Math.Abs(m.Z - -9.5) < 1e-3);
+
+        // Away from the base the level below clears the stock; the flat level stays over the base (half width 15,
+        // plus tool radius, stock to leave and tolerance) instead of re-clearing the whole stock.
+        Assert.All(flat, m => Assert.True(Math.Max(Math.Abs(m.X), Math.Abs(m.Y)) < 19, $"{m}"));
+        Assert.Contains(cuts, m => m.Z < -9.5 && Math.Max(Math.Abs(m.X), Math.Abs(m.Y)) > 20);
+    }
+
     [Fact]
     public void Waterline_FollowsTheWalls()
     {

@@ -692,6 +692,7 @@ public sealed class CamPipeline : IDisposable
         var input = new
         {
             Generator = GeneratorVersion,
+            ToolpathGenerator.Revision,
             Operation = new { operation.Strategy, operation.ToolId, operation.Parameters },
             Setup = SetupCopy(operation.SetupId),
             Tool = tool,

@@ -36,14 +36,15 @@ internal static class RestMachining
 
         var stockTop = (double)setup.StockBounds.Max.Z;
         var top = Math.Min(settings.MaxZ ?? stockTop, stockTop);
-        var levels = context.Levels(top, context.ClearingFloor, settings.Stepdown, flats: true);
+        var levels = context.ClearingLevels(top, context.ClearingFloor, settings.Stepdown);
         var entryTop = stockTop;
         var origin = new PointD(grid.OriginU, grid.OriginV);
         var mask = new bool[grid.CountU * grid.CountV];
         for (var i = 0; i < levels.Count; i++)
         {
             context.Token.ThrowIfCancellationRequested();
-            var z = levels[i];
+            var level = levels[i];
+            var z = level.Z;
             for (var ray = 0; ray < mask.Length; ray++)
             {
                 mask[ray] = HasMaterialAbove(grid, ray, (float)(z + (0.5 * context.Tolerance)));
@@ -54,14 +55,17 @@ internal static class RestMachining
             material = Polygons.Open(Polygons.Difference(material, part), 1.5 * grid.Resolution, context.Tolerance);
             if (material.Count > 0)
             {
-                var area = Polygons.Intersect(context.ClearingRegion(z), Polygons.Offset(material, context.Radius, context.Tolerance));
+                var area = Polygons.Intersect(context.LevelRegion(level), Polygons.Offset(material, context.Radius, context.Tolerance));
                 if (area.Count > 0)
                 {
                     ZLevelRoughing.Clear(context, builder, area, z, entryTop);
                 }
             }
 
-            entryTop = z;
+            if (!level.IsFlat)
+            {
+                entryTop = z;
+            }
             context.Report(0.3 + (0.7 * (i + 1) / levels.Count));
         }
     }

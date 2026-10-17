@@ -13,13 +13,17 @@ internal static class ZLevelRoughing
         var settings = context.Settings;
         var stockTop = (double)context.Setup.StockBounds.Max.Z;
         var top = Math.Min(settings.MaxZ ?? stockTop, stockTop);
-        var levels = context.Levels(top, context.ClearingFloor, settings.Stepdown, flats: true);
+        var levels = context.ClearingLevels(top, context.ClearingFloor, settings.Stepdown);
         var entryTop = stockTop;
         for (var i = 0; i < levels.Count; i++)
         {
-            var z = levels[i];
-            Clear(context, builder, context.ClearingRegion(z), z, entryTop);
-            entryTop = z;
+            var level = levels[i];
+            Clear(context, builder, context.LevelRegion(level), level.Z, entryTop);
+            if (!level.IsFlat)
+            {
+                entryTop = level.Z;
+            }
+
             context.Report((i + 1.0) / levels.Count);
         }
     }
