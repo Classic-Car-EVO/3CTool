@@ -215,6 +215,8 @@ public sealed class FeederUiTests
             Assert.False(vm.Jog.CanJog);
             Assert.False(vm.Jobs.DeleteCommand.CanExecute(null));
 
+            // Past the opening moves, so the tool position is known and the stopped run is resumable.
+            await ui.WaitAsync(() => vm.Run.ProgressPercent >= 10, "past the opening moves");
             await ui.ClickAsync("PauseButton");
             await ui.WaitAsync(() => vm.Run.State == "Paused" && vm.Run.CanResume, "paused");
             await ui.ClickAsync("ResumeButton");
