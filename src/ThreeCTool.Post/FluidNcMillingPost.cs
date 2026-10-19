@@ -14,21 +14,18 @@ namespace ThreeCTool.Post;
 /// <list type="number">
 /// <item>header comments, modal preamble and a retract to the safe machine Z;</item>
 /// <item>a tool-change prompt (M0);</item>
-/// <item>work Z from the touch plate (every file of a touch-plate setup, the first file of a tool-setter setup); the
-/// first file of a tool-setter setup also stores the setter reading of the reference tool in G59 Z;</item>
-/// <item>tool-setter setups: tool length offset = setter reading − stored reference (FluidNC expressions);</item>
+/// <item>work Z from the touch plate in every file: on the material (stock top centre), or, when the operator answers
+/// Yes to the <c>(MC:ASK)</c> question at the machine, on the bed at X0 Y0 (stock bottom Z); no tool length offset;</item>
 /// <item>spindle start (M3 S) plus an operator confirmation (M0), coolant and dust extraction;</item>
 /// <item>the operations (arc fitted, inverse time for rotary feed moves) and the footer.</item>
 /// </list>
-/// Probe sequences are wrapped in <c>(MC:PROBE BEGIN)</c> / <c>(MC:PROBE END)</c> markers for job recovery.
+/// The probe sequence is wrapped in <c>(MC:PROBE BEGIN TOUCHPLATE)</c> / <c>(MC:PROBE END)</c> markers for job recovery.
+/// The tool setter settings of the machine and the setup's probe method are not used.
 /// </summary>
 public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
 {
     /// <summary>Longest code line accepted (FluidNC's RX buffer is 128 bytes including the newline).</summary>
     public const int MaxLineLength = 120;
-
-    /// <summary>Work offset whose Z stores the setter reading of the reference tool.</summary>
-    public const WorkOffset ReferenceOffset = WorkOffset.G59;
 
     private const double MinimumMoveLength = 1e-3;
 
@@ -40,10 +37,9 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         var writer = new Writer();
         var machine = request.Machine;
         var setup = request.Setup;
-        var probe = machine.Probe;
         var safeZ = machine.SafeZMachine;
-        var setter = setup.ProbeMethod == ProbeMethod.ToolSetter;
-        var plate = !setter || request.FirstInSetup;
+        var spot = request.TouchPlate!.Value;
+        var material = $"on the material at X{Writer.Format(spot.X)} Y{Writer.Format(spot.Y)}";
         var rotary = request.Operations[0].Toolpath.Frame;
         var seconds = EstimatedSeconds(request);
 
@@ -61,7 +57,7 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         writer.Comment($"Collet: {request.Collet?.Name ?? "unspecified"}");
         writer.Comment($"Material: {request.Material?.Name ?? "unspecified"}");
         writer.Comment($"Spindle: {Writer.Format(request.Rpm)} RPM");
-        writer.Comment($"Probe: {(setter ? "tool setter" : "touch plate")}{(request.FirstInSetup ? ", first file of the setup" : string.Empty)}");
+        writer.Comment($"Probe: touch plate {material}{(spot.BedZ is null ? string.Empty : ", or on the bed at X0 Y0 if chosen at the machine")}");
         writer.Comment($"Operations: {string.Join(", ", request.Operations.Select(o => o.Operation.Name))}");
         writer.Comment($"Estimated time: {TimeSpan.FromSeconds(Math.Round(seconds)):c}");
         writer.Comment($"Generator: 3C Tool {request.GeneratorVersion}");
@@ -75,6 +71,8 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
             writer.Comment($"WARNING: {warning}");
         }
 
+        // The feeder keeps the tool tip above the table with this (machine Z of the collet nut on the table + stickout).
+        writer.Comment($"{ToolMarker} STICKOUT {Writer.Format(Math.Max(tool.Stickout, 0))}");
         var wcs = $"G{54 + (int)setup.WorkOffset}";
         writer.Line($"G21 G90 G94 G17 G91.1 {wcs}");
         writer.MachineZ(safeZ);
@@ -101,44 +99,33 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         writer.Comment($"Insert tool {tool.Name}{collet}, stickout {Writer.Format(tool.Stickout)} mm{dial}");
         writer.Line("M0");
 
-        // Work Z from the touch plate.
-        if (plate)
+        // Work Z from the touch plate: on the material, or on the bed at X0 Y0 when the operator chooses so.
+        writer.Comment($"{HostMarker} BEGIN TOUCHPLATE");
+        writer.Line("G49");
+        writer.MachineZ(safeZ);
+        if (rotary.IsRotary)
         {
-            var spot = request.TouchPlate!.Value;
-            writer.Comment($"{HostMarker} BEGIN TOUCHPLATE");
-            writer.Line("G49");
-            writer.MachineZ(safeZ);
-            if (rotary.IsRotary)
-            {
-                writer.Rapid(a: rotary.BaseAngle);
-            }
-
-            writer.Rapid(x: spot.X, y: spot.Y);
-            writer.Comment($"Place the touch plate on the stock under the tool, at most {Writer.Format(PlateSeek(request))} mm below it, and attach the probe clip");
-            writer.Line("M0");
-            ProbeDown(writer, PlateSeek(request), probe);
-            writer.Line($"G10 L20 P{1 + (int)setup.WorkOffset} Z{Writer.Format(spot.SurfaceZ + probe.TouchPlateThickness)}");
-            if (setter)
-            {
-                ProbeSetter(writer, request);
-                writer.Line($"G10 L2 P{1 + (int)ReferenceOffset} Z[#{ProbeZParameter}]");
-            }
-
-            writer.MachineZ(safeZ);
-            writer.Comment($"{HostMarker} END");
-            writer.Comment("Remove the touch plate and the probe clip");
-            writer.Line("M0");
+            writer.Rapid(a: rotary.BaseAngle);
         }
 
-        // Tool length offset relative to the reference tool.
-        if (setter)
+        if (spot.BedZ is { } bedZ)
         {
-            writer.Comment($"{HostMarker} BEGIN");
-            ProbeSetter(writer, request);
-            writer.Line($"G43.1 Z[#{ProbeZParameter}-#{ReferenceZParameter}]");
-            writer.MachineZ(safeZ);
-            writer.Comment($"{HostMarker} END");
+            writer.Comment($"Probe the touch plate on the bed at X0 Y0? Yes: plate on the bed at X0 Y0. No: plate {material}");
+            writer.Comment($"{AskMarker} BEGIN");
+            ProbePlate(writer, request, 0, 0, bedZ, "on the bed at X0 Y0");
+            writer.Comment($"{AskMarker} ELSE");
+            ProbePlate(writer, request, spot.X, spot.Y, spot.SurfaceZ, material);
+            writer.Comment($"{AskMarker} END");
         }
+        else
+        {
+            ProbePlate(writer, request, spot.X, spot.Y, spot.SurfaceZ, material);
+        }
+
+        writer.MachineZ(safeZ);
+        writer.Comment($"{HostMarker} END");
+        writer.Comment("Remove the touch plate and the probe clip");
+        writer.Line("M0");
 
         // Spindle, coolant, dust extraction.
         writer.Line($"M3 S{Writer.Format(request.Rpm)}");
@@ -219,11 +206,9 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
 
     private const string HostMarker = "MC:PROBE";
 
-    /// <summary>Probe result Z (machine coordinates).</summary>
-    private const int ProbeZParameter = 5063;
+    private const string AskMarker = "MC:ASK";
 
-    /// <summary>Z of <see cref="ReferenceOffset"/>.</summary>
-    private const int ReferenceZParameter = 5221 + (20 * (int)ReferenceOffset) + 2;
+    private const string ToolMarker = "MC:TOOL";
 
     private static string SetupText(Setup setup, SetupFrame frame) => setup.Orientation switch
     {
@@ -253,14 +238,16 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         return safe.Length == 0 ? fallback : safe;
     }
 
-    private static void ProbeSetter(Writer writer, MillingPostRequest request)
+    /// <summary>Rapid above the plate at WCS X/Y, prompt, probe it and set the work Z (<paramref name="surfaceZ"/> = plate bottom).</summary>
+    private static void ProbePlate(Writer writer, MillingPostRequest request, double x, double y, double surfaceZ, string where)
     {
         var probe = request.Machine.Probe;
-        writer.MachineZ(request.Machine.SafeZMachine);
-        writer.Line($"G53 G0 X{Writer.Format(probe.ToolSetterX)} Y{Writer.Format(probe.ToolSetterY)}");
-        writer.MachineZ(probe.ToolSetterStartZ);
-        writer.Forget();
-        ProbeDown(writer, SetterSeek(request), probe);
+        var seek = PlateSeek(request);
+        writer.Rapid(x: x, y: y);
+        writer.Comment($"Place the touch plate {where} under the tool, at most {Writer.Format(seek)} mm below it, and attach the probe clip");
+        writer.Line("M0");
+        ProbeDown(writer, seek, probe);
+        writer.Line($"G10 L20 P{1 + (int)request.Setup.WorkOffset} Z{Writer.Format(surfaceZ + probe.TouchPlateThickness)}");
     }
 
     /// <summary>Seek down by <paramref name="distance"/>, back off, latch slowly and return to absolute mode.</summary>
@@ -273,23 +260,23 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         writer.Forget();
     }
 
-    private static (double Low, double High)? Range(AxisConfig? config) =>
-        config is not { MaxTravel: > 0 }
-            ? null
-            : config.HomingPositiveDirection
-                ? (config.HomingMachinePosition - config.MaxTravel, config.HomingMachinePosition)
-                : (config.HomingMachinePosition, config.HomingMachinePosition + config.MaxTravel);
+    private static (double Low, double High)? Range(AxisConfig? config) => config?.Travel();
 
-    /// <summary>Probe seek distance from <paramref name="startZ"/>, clamped to the Z travel below it.</summary>
+    /// <summary>
+    /// Lowest machine Z of the spindle with this tool: the tool tip on the table. The low end of the Z travel is the
+    /// collet nut on the table; null when the Z travel is not configured.
+    /// </summary>
+    private static double? ToolFloor(MillingPostRequest request) =>
+        Range(request.Machine.GetAxis(AxisName.Z)) is { } z ? z.Low + Math.Max(request.Tool.Stickout, 0) : null;
+
+    /// <summary>Probe seek distance from <paramref name="startZ"/>, clamped so that the tool tip stays above the table.</summary>
     private static double Seek(MillingPostRequest request, double startZ)
     {
         var distance = request.Machine.Probe.MaxDistance;
-        return Range(request.Machine.GetAxis(AxisName.Z)) is { } z ? Math.Min(distance, startZ - z.Low) : distance;
+        return ToolFloor(request) is { } floor ? Math.Min(distance, startZ - floor) : distance;
     }
 
     private static double PlateSeek(MillingPostRequest request) => Seek(request, request.Machine.SafeZMachine);
-
-    private static double SetterSeek(MillingPostRequest request) => Seek(request, request.Machine.Probe.ToolSetterStartZ);
 
     private static void WriteToolpath(Writer writer, PostOperation operation, double? tolerance)
     {
@@ -452,20 +439,13 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
             throw new PostException($"Setup '{setup.Name}' is rotary but the machine has no A axis.");
         }
 
-        var setter = setup.ProbeMethod == ProbeMethod.ToolSetter;
-        if (setter && setup.WorkOffset == ReferenceOffset)
-        {
-            throw new PostException($"Setup '{setup.Name}' uses {ReferenceOffset}, which stores the tool-setter reference; choose another work offset.");
-        }
-
-        var plate = !setter || request.FirstInSetup;
-        if (plate && request.TouchPlate is null)
+        if (request.TouchPlate is null)
         {
             throw new PostException("The touch plate position is required to set the work Z.");
         }
 
         CheckVerification(request, warnings);
-        CheckTravel(request, plate, setter);
+        CheckTravel(request);
     }
 
     private static void CheckVerification(MillingPostRequest request, List<string> warnings)
@@ -500,7 +480,7 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
         warnings.Add($"Verification overridden by the user: {problem}.");
     }
 
-    private static void CheckTravel(MillingPostRequest request, bool plate, bool setter)
+    private static void CheckTravel(MillingPostRequest request)
     {
         var machine = request.Machine;
         var probe = machine.Probe;
@@ -509,27 +489,22 @@ public sealed class FluidNcMillingPost : IPostProcessor<MillingPostRequest>
 
         // Machine-coordinate targets.
         Check(2, machine.SafeZMachine, "the safe Z");
-        if (setter)
+        if (!(PlateSeek(request) > 2 * probe.Retract))
         {
-            Check(0, probe.ToolSetterX, "the tool setter X");
-            Check(1, probe.ToolSetterY, "the tool setter Y");
-            Check(2, probe.ToolSetterStartZ, "the tool setter start Z");
-            if (!(SetterSeek(request) > 2 * probe.Retract))
-            {
-                throw new PostException("There is no Z travel left below the tool setter start Z to probe.");
-            }
-        }
-
-        if (plate && !(PlateSeek(request) > 2 * probe.Retract))
-        {
-            throw new PostException("There is no Z travel left below the safe Z to probe the touch plate.");
+            throw new PostException(ToolFloor(request) is { } floor
+                ? $"At the safe Z (machine Z {Writer.Format(machine.SafeZMachine)}) the tip of the {Writer.Format(request.Tool.Stickout)} mm stickout tool is {Writer.Format(machine.SafeZMachine - floor)} mm above the table: there is no room to probe the touch plate. Raise the safe Z or shorten the stickout."
+                : "There is no Z travel left below the safe Z to probe the touch plate.");
         }
 
         // WCS positions: travel span, and absolute limits when the work offset is known.
         var points = request.Operations.SelectMany(o => o.Toolpath.Moves.Select(m => m.Position)).ToList();
-        if (plate && request.TouchPlate is { } spot)
+        if (request.TouchPlate is { } spot)
         {
             points.Add(new P3(spot.X, spot.Y, points[0].Z));
+            if (spot.BedZ is not null)
+            {
+                points.Add(new P3(0, 0, points[0].Z));
+            }
         }
 
         for (var axis = 0; axis < 3; axis++)

@@ -4,6 +4,8 @@ using System.Globalization;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 
+using Grpc.Core;
+
 using ThreeCTool.Feeder.Contracts;
 using ThreeCTool.Feeder.Services;
 
@@ -129,6 +131,10 @@ public sealed partial class SetupViewModel : ViewModelBase
     [ObservableProperty]
     public partial string ConfigText { get; private set; } = string.Empty;
 
+    /// <summary>Console, reboot and shut down are offered (installed feeder, local socket).</summary>
+    [ObservableProperty]
+    public partial bool MaintenanceAvailable { get; private set; }
+
     private DateTimeOffset? PairingExpiresAt { get; set; }
 
     /// <summary>Settings and pairing sections are shown on the feeder's local socket only.</summary>
@@ -144,6 +150,7 @@ public sealed partial class SetupViewModel : ViewModelBase
 
         await LoadSettingsAsync();
         await LoadPairingsAsync();
+        await LoadMaintenanceAsync();
     }
 
     public void Apply(FeederStatus? status)
@@ -304,6 +311,36 @@ public sealed partial class SetupViewModel : ViewModelBase
         }
     }
 
+    [RelayCommand]
+    private Task ConsoleAsync() => MaintenanceAsync(
+        MaintenanceAction.Console,
+        "Switch to the console",
+        "The touch screen closes and a login prompt appears; log in with a USB keyboard. "
+        + "'sudo systemctl start 3ctool-feeder-ui' or a reboot brings the touch screen back.",
+        "Switch",
+        "Switching to the console...");
+
+    [RelayCommand]
+    private Task RebootAsync() => MaintenanceAsync(
+        MaintenanceAction.Reboot, "Reboot", "Restart the feeder? It is back in about a minute.", "Reboot", "Rebooting...");
+
+    [RelayCommand]
+    private Task PowerOffAsync() => MaintenanceAsync(
+        MaintenanceAction.PowerOff,
+        "Shut down",
+        "Shut the feeder down? Wait until the green LED stops flashing before switching off the power.",
+        "Shut down",
+        "Shutting down...");
+
+    private async Task MaintenanceAsync(MaintenanceAction action, string title, string message, string confirmText, string done)
+    {
+        if (await shell.ConfirmAsync(title, message, confirmText, danger: true)
+            && await shell.RunAsync(async () => await shell.Admin.RequestMaintenanceAsync(new MaintenanceRequest { Action = action })))
+        {
+            shell.ShowMessage(done);
+        }
+    }
+
     partial void OnIsTcpChanged(bool value) => Dirty = true;
 
     partial void OnSerialPortChanged(string? value) => Dirty = true;
@@ -349,6 +386,19 @@ public sealed partial class SetupViewModel : ViewModelBase
             {
                 Pairings.Add(new PairingItemViewModel(pairing));
             }
+        }
+    }
+
+    private async Task LoadMaintenanceAsync()
+    {
+        try
+        {
+            MaintenanceAvailable = (await shell.Admin.GetMaintenanceAsync(new())).Available;
+        }
+        catch (RpcException)
+        {
+            // Older feeder without maintenance support.
+            MaintenanceAvailable = false;
         }
     }
 

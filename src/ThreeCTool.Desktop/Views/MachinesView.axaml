@@ -117,14 +117,15 @@
           </ItemsControl>
           <Button Name="AddCollet" Content="Add collet" Command="{Binding AddColletCommand}" />
 
-          <TextBlock Text="Probing" Classes="section" />
-          <Grid ColumnDefinitions="190,*" Margin="0,2">
+          <TextBlock Text="Probing (touch plate)" Classes="section" />
+          <!-- Tool setter: programs probe only the touch plate; the settings are kept but hidden. -->
+          <Grid ColumnDefinitions="190,*" Margin="0,2" IsVisible="False">
             <TextBlock Text="Default method" VerticalAlignment="Center" />
             <ComboBox Grid.Column="1" ItemsSource="{x:Static vm:MachineEditorViewModel.ProbeMethods}" SelectedItem="{Binding Model.Probe.DefaultMethod, Mode=TwoWay}" />
           </Grid>
-          <ContentControl Content="{Binding ToolSetterX}" />
-          <ContentControl Content="{Binding ToolSetterY}" />
-          <ContentControl Content="{Binding ToolSetterStartZ}" />
+          <ContentControl Content="{Binding ToolSetterX}" IsVisible="False" />
+          <ContentControl Content="{Binding ToolSetterY}" IsVisible="False" />
+          <ContentControl Content="{Binding ToolSetterStartZ}" IsVisible="False" />
           <ContentControl Content="{Binding TouchPlate}" />
           <ContentControl Content="{Binding ProbeDistance}" />
           <ContentControl Content="{Binding ProbeRetract}" />

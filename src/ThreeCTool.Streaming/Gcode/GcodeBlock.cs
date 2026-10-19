@@ -31,8 +31,30 @@ public sealed record HostDirective(string Verb, IReadOnlyList<string> Arguments,
 
     public bool IsProbeEnd => Verb == "PROBE" && Arguments is ["END", ..];
 
-    /// <summary>Markers only structure the file for recovery; they need no handler.</summary>
-    public bool IsMarker => Verb == "PROBE";
+    /// <summary>
+    /// Yes/No question to the operator, asked by the streamer: the last plain comment before <c>(MC:ASK BEGIN)</c> is the
+    /// question; the lines up to <c>(MC:ASK ELSE)</c> run on Yes, the lines from there to <c>(MC:ASK END)</c> on No.
+    /// </summary>
+    public bool IsAsk => Verb == "ASK";
+
+    public bool IsAskBegin => IsAsk && Arguments is ["BEGIN", ..];
+
+    public bool IsAskElse => IsAsk && Arguments is ["ELSE", ..];
+
+    public bool IsAskEnd => IsAsk && Arguments is ["END", ..];
+
+    /// <summary>Markers structure the file for recovery and operator questions; they need no directive handler.</summary>
+    public bool IsMarker => Verb is "PROBE" or "ASK" or "TOOL";
+
+    /// <summary>
+    /// <c>(MC:TOOL STICKOUT 25)</c>: length (mm) of the tool below the collet nut, used to keep the tool tip above the
+    /// table. Null for other directives or a malformed value.
+    /// </summary>
+    public double? ToolStickout =>
+        Verb == "TOOL" && Arguments is ["STICKOUT", var value, ..]
+            && double.TryParse(value, NumberStyles.Float, CultureInfo.InvariantCulture, out var stickout) && double.IsFinite(stickout) && stickout >= 0
+            ? stickout
+            : null;
 
     public static HostDirective? TryParse(string comment)
     {

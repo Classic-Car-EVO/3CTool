@@ -164,6 +164,47 @@ public sealed class JobLifecycleTests
         Assert.True(end.RecoveryAvailable);
     }
 
+    [Theory]
+    [InlineData(true, 10)]
+    [InlineData(false, 20)]
+    public async Task Question_AnsweredAtTheMachine_RunsOnlyTheChosenBranch(bool yes, double x)
+    {
+        await using var feeder = await FeederHarness.StartAsync();
+        string[] lines =
+        [
+            "(3C Tool test job)", "G21 G90 G94 G54", "G0 Z5", "(Go to X10?)",
+            "(MC:ASK BEGIN)", "G0 X10 Y0", "(MC:ASK ELSE)", "G0 X20 Y0", "(MC:ASK END)", "M30",
+        ];
+        var job = await FeederHarness.UploadAsync(feeder.Local, lines);
+        var reply = await feeder.Local.StartJobAsync(new StartJobRequest { JobId = job.JobId });
+
+        var asked = await feeder.WaitStatusAsync(s => s.Prompt is not null);
+        Assert.Equal(PromptKind.Choice, asked.Prompt.Kind);
+        Assert.Equal("Go to X10?", asked.Prompt.Message);
+        Assert.Equal(5, asked.Prompt.Line);
+        Assert.True(asked.Prompt.CanCancel);
+        Assert.Equal("ProgramPaused", asked.Job.State);
+
+        var end = await feeder.RunToEndAsync(reply.RunId, p => new PromptAnswer { Id = p.Id, Confirmed = true, Choice = yes });
+        Assert.Equal("Completed", end.Job.State);
+        var g54 = FeederHarness.G54;
+        TestJobs.AssertPosition([g54[0] + x, g54[1], g54[2] + 5], feeder.Simulator.MachinePosition);
+    }
+
+    [Fact]
+    public async Task Question_Cancelled_StopsTheRun()
+    {
+        await using var feeder = await FeederHarness.StartAsync();
+        string[] lines = ["G21 G90 G94 G54", "G0 Z5", "(Go to X10?)", "(MC:ASK BEGIN)", "G0 X10 Y0", "(MC:ASK END)", "M30"];
+        var job = await FeederHarness.UploadAsync(feeder.Local, lines);
+        var reply = await feeder.Local.StartJobAsync(new StartJobRequest { JobId = job.JobId });
+
+        var end = await feeder.RunToEndAsync(reply.RunId, p => new PromptAnswer { Id = p.Id, Confirmed = false });
+        Assert.Equal("Stopped", end.Job.State);
+        var g54 = FeederHarness.G54;
+        Assert.NotEqual(g54[0] + 10, feeder.Simulator.MachinePosition[0], 3);
+    }
+
     [Fact]
     public async Task PauseResumeAndFeedOverride_AreRecorded()
     {
@@ -233,8 +274,6 @@ public sealed class JobLifecycleTests
         Assert.Equal("Faulted", faulted.Job.State);
         Assert.True((await feeder.WaitStatusAsync(s => s.RecoveryAvailable)).RecoveryAvailable);
         Assert.Empty(faulted.FeedbackRunId);
-        var deleteRefused = await Assert.ThrowsAsync<RpcException>(async () => await client.DeleteJobAsync(new JobRef { JobId = job.JobId }));
-        Assert.Equal(StatusCode.FailedPrecondition, deleteRefused.StatusCode);
         var feedbackRefused = await Assert.ThrowsAsync<RpcException>(async () =>
             await feeder.Local.SubmitFeedbackAsync(new FeedbackSubmission { RunId = reply.RunId, FinishRating = 3 }));
         Assert.Equal(StatusCode.FailedPrecondition, feedbackRefused.StatusCode);
@@ -276,6 +315,42 @@ public sealed class JobLifecycleTests
         var status = await feeder.WaitStatusAsync(s => !s.RecoveryAvailable && s.FeedbackRunId == reply.RunId);
         Assert.False((await feeder.Local.GetRecoveryPlanAsync(new Empty())).Available);
         Assert.Equal(reply.RunId, status.FeedbackRunId);
+    }
+
+    [Fact]
+    public async Task DeleteJob_WithARecoverableRun_DiscardsTheRecovery()
+    {
+        await using var feeder = await FeederHarness.StartAsync(new SimulatorOptions { TimeScale = 20 });
+        var (lines, _) = TestJobs.Zigzag();
+        var job = await FeederHarness.UploadAsync(feeder.Local, lines);
+        var other = await FeederHarness.UploadAsync(feeder.Local, [.. lines, "(other)"], "other.nc");
+        var reply = await feeder.Local.StartJobAsync(new StartJobRequest { JobId = job.JobId });
+        await feeder.WaitStatusAsync(s => s.Job is { State: "Running", Line: > 15 });
+
+        var running = await Assert.ThrowsAsync<RpcException>(async () => await feeder.Local.DeleteJobAsync(new JobRef { JobId = job.JobId }));
+        Assert.Equal(StatusCode.FailedPrecondition, running.StatusCode);
+
+        await feeder.Local.StopAsync(new Empty());
+        Assert.Equal("Stopped", (await feeder.RunToEndAsync(reply.RunId)).Job.State);
+        Assert.True((await feeder.WaitStatusAsync(s => s.RecoveryAvailable)).RecoveryAvailable);
+        var listed = await feeder.Local.ListJobsAsync(new Empty());
+        Assert.True(listed.Jobs.Single(j => j.JobId == job.JobId).Recoverable);
+        Assert.False(listed.Jobs.Single(j => j.JobId == other.JobId).Recoverable);
+
+        // Another job keeps the recovery; deleting the interrupted job discards it.
+        await feeder.Local.DeleteJobAsync(new JobRef { JobId = other.JobId });
+        Assert.True((await feeder.Local.GetRecoveryPlanAsync(new Empty())).Available);
+        await feeder.Local.DeleteJobAsync(new JobRef { JobId = job.JobId });
+
+        var status = await feeder.WaitStatusAsync(s => !s.RecoveryAvailable && s.FeedbackRunId == reply.RunId);
+        Assert.Equal(reply.RunId, status.FeedbackRunId);
+        Assert.Empty((await feeder.Local.ListJobsAsync(new Empty())).Jobs);
+        Assert.False((await feeder.Local.GetRecoveryPlanAsync(new Empty())).Available);
+        var log = await feeder.Local.GetRunLogAsync(new RunRef { RunId = reply.RunId });
+        Assert.Contains(log.Events, e => e.Message == "Recovery discarded: the job was deleted");
+
+        await feeder.Local.SubmitFeedbackAsync(new FeedbackSubmission { RunId = reply.RunId, FinishRating = 3 });
+        Assert.Single((await feeder.Local.ListFeedbackAsync(new ListFeedbackRequest())).Records);
     }
 
     [Fact]

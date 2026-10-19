@@ -1,5 +1,7 @@
 using System.Numerics;
 
+using ThreeCTool.Toolpaths;
+
 using static ThreeCTool.Simulation.Tests.Kit;
 
 namespace ThreeCTool.Simulation.Tests;
@@ -70,5 +72,25 @@ public sealed class SimulationSessionTests(ComputeFixture fixture)
         Assert.Equal(new Vector3(35, 10, 7), tip);
         Assert.Equal(Vector3.UnitZ, axis);
         Assert.Equal(new Vector3(35, 16, 40), session.ToolAt(1, 3).Tip);
+    }
+
+    [Fact]
+    public async Task Create_LongToolpath_KeepsEveryMove()
+    {
+        // Regression: .NET 10 on-stack replacement dropped all moves after the first few thousand when the step was
+        // expanded; the build turns quick JIT for loops off (Directory.Build.props).
+        const int count = 200_000;
+        var moves = new List<ToolpathMove> { Rapid(5, 10, 40), Plunge(5, 10, 9) };
+        for (var i = 0; moves.Count < count; i++)
+        {
+            moves.Add(Cut(5 + (i % 300 * 0.1), 10 + (i / 300 % 2), 9));
+        }
+
+        var job = Job(fixture.Compute, Box(Vector3.Zero, new Vector3(40, 20, 5)), BoxStock(Vector3.Zero, new Vector3(40, 20, 10)), [Milling("long", Flat(), moves, collet: Collet())]);
+        using var session = await Task.Run(() => SimulationSession.Create(job));
+        Assert.Equal(count, session.MoveCount(0));
+        var last = moves[^1];
+        Assert.Equal(new Vector3((float)last.X, (float)last.Y, (float)last.Z), session.ToolAt(0, count - 1).Tip);
+        Assert.Equal(new Vector3((float)moves[^2].X, (float)moves[^2].Y, (float)moves[^2].Z), session.ToolAt(0, count - 2).Tip);
     }
 }

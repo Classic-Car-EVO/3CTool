@@ -1,0 +1,6 @@
+[Unit]
+Description=3C Tool feeder maintenance: %i
+
+[Service]
+Type=oneshot
+ExecStart=/opt/3ctool-feeder/maintenance %i

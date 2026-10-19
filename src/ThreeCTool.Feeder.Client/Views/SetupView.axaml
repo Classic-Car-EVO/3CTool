@@ -86,6 +86,15 @@
         </Grid>
         <Button Content="Read controller config" Command="{Binding ReadConfigCommand}" Margin="0,6,0,0" />
         <TextBlock Text="{Binding ConfigText}" TextWrapping="Wrap" FontSize="14" />
+
+        <StackPanel Spacing="2" IsVisible="{Binding MaintenanceAvailable}">
+          <TextBlock Text="Maintenance" Classes="section" />
+          <WrapPanel>
+            <Button Name="ConsoleButton" Content="Console" Command="{Binding ConsoleCommand}" Margin="0,0,6,6" />
+            <Button Name="RebootButton" Content="Reboot" Command="{Binding RebootCommand}" Margin="0,0,6,6" />
+            <Button Name="PowerOffButton" Content="Shut down" Command="{Binding PowerOffCommand}" Margin="0,0,6,6" />
+          </WrapPanel>
+        </StackPanel>
       </StackPanel>
     </ScrollViewer>
 

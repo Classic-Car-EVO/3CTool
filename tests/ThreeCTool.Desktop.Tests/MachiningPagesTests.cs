@@ -206,10 +206,11 @@ public sealed class MachiningPagesTests : IAsyncDisposable
         Assert.True(playback.IsAvailable);
         await playback.SettleAsync();
         Assert.True(playback.Duration > 0);
-        Assert.Equal(playback.Duration, playback.Time);
+        Assert.Equal(0, playback.Time);
         var scene = page.Scene.Scene;
         Assert.NotEmpty(Assert.Single(scene.Points).Positions);
-        Assert.Null(scene.Progress);
+        Assert.Equal((0, 0), scene.Progress);
+        Assert.Contains("move 1/", playback.PositionText, StringComparison.Ordinal);
 
         playback.SeekTo(1, 2);
         await playback.SettleAsync();
@@ -235,6 +236,26 @@ public sealed class MachiningPagesTests : IAsyncDisposable
         playback.ToEndCommand.Execute(null);
         await playback.SettleAsync();
         Assert.Null(scene.Progress);
+
+        if (VideoWriter.FindFfmpeg() is not null)
+        {
+            // The whole job as a video: 5 frames plus the finished part held for a second.
+            playback.VideoSize = new("tiny", (160, 90));
+            playback.VideoLength = new("1 s", 1);
+            playback.FrameRate = new("5 fps", 5);
+            var video = Path.Combine(fixture.Root, "sim.mp4");
+            files.Answers.Enqueue(video);
+            await playback.ExportVideoCommand.ExecuteAsync(null);
+            Assert.False(main.MessageIsError, main.Message);
+            Assert.Equal("Saved the video sim.mp4.", main.Message);
+            Assert.False(playback.IsExporting);
+            Assert.True(playback.CanControl);
+            Assert.Equal(10, await VideoWriterTests.CountFramesAsync(video));
+            Assert.False(playback.ShowDeviation);
+            await playback.SettleAsync();
+            Assert.Null(scene.Progress);
+            Assert.NotEmpty(Assert.Single(scene.Points).Positions);
+        }
 
         await page.PostCommand.ExecuteAsync(null);
         Assert.False(main.MessageIsError, main.Message);

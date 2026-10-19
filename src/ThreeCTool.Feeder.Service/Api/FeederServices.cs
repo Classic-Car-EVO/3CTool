@@ -67,16 +67,10 @@ public sealed class FeederService(
         return Task.FromResult(list);
     }
 
-    public override Task<Empty> DeleteJob(JobRef request, ServerCallContext context)
+    public override async Task<Empty> DeleteJob(JobRef request, ServerCallContext context)
     {
-        var running = jobs.IsActive && jobs.Snapshot()?.JobId == request.JobId;
-        if (running || database.LatestRecoverableRun()?.JobId == request.JobId)
-        {
-            throw new FeederStateException("The job is running or has a run that can still be recovered.");
-        }
-
-        store.Delete(request.JobId);
-        return Task.FromResult(None);
+        await jobs.DeleteJobAsync(request.JobId, context.CancellationToken).ConfigureAwait(false);
+        return None;
     }
 
     public override Task<Preview> GetPreview(JobRef request, ServerCallContext context) => store.GetPreviewAsync(request.JobId, context.CancellationToken);
@@ -285,6 +279,7 @@ public sealed class FeederService(
         UploadedAt = ProtoConvert.ToTimestamp(job.UploadedAt),
         LastRunState = lastRun?.State ?? string.Empty,
         LastRunAt = ProtoConvert.ToTimestamp(lastRun?.StartedAt),
+        Recoverable = lastRun?.Recoverable ?? false,
     };
 
     private static async IAsyncEnumerable<ByteString> Data(IAsyncStreamReader<UploadChunk> reader, [EnumeratorCancellation] CancellationToken cancellationToken)
@@ -305,7 +300,9 @@ public sealed class LocalAdminService(
     PairingManager pairing,
     FeederIdentity identity,
     SettingsStore settings,
-    JobManager jobs) : LocalAdmin.LocalAdminBase
+    JobManager jobs,
+    FeederOptions options,
+    ILogger<LocalAdminService> logger) : LocalAdmin.LocalAdminBase
 {
     private static readonly Empty None = new();
 
@@ -376,4 +373,33 @@ public sealed class LocalAdminService(
         list.Ports.AddRange(System.IO.Ports.SerialPort.GetPortNames().Order(StringComparer.Ordinal));
         return Task.FromResult(list);
     }
+
+    public override Task<MaintenanceInfo> GetMaintenance(Empty request, ServerCallContext context) =>
+        Task.FromResult(new MaintenanceInfo { Available = MaintenanceAvailable });
+
+    public override Task<Empty> RequestMaintenance(MaintenanceRequest request, ServerCallContext context)
+    {
+        var action = request.Action switch
+        {
+            MaintenanceAction.Console => "console",
+            MaintenanceAction.Reboot => "reboot",
+            MaintenanceAction.PowerOff => "poweroff",
+            _ => throw new ArgumentException("Unknown maintenance action."),
+        };
+        if (!MaintenanceAvailable)
+        {
+            throw new FeederStateException("Maintenance is only available on an installed feeder.");
+        }
+
+        if (jobs.IsActive)
+        {
+            throw new FeederStateException("A job is running; stop it first.");
+        }
+
+        logger.MaintenanceRequested(action);
+        File.WriteAllText(Path.Combine(options.MaintenanceDirectory!, action + ".request"), string.Empty);
+        return Task.FromResult(None);
+    }
+
+    private bool MaintenanceAvailable => !string.IsNullOrEmpty(options.MaintenanceDirectory) && Directory.Exists(options.MaintenanceDirectory);
 }

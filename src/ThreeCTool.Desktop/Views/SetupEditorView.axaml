@@ -25,9 +25,10 @@
       <ComboBox Grid.Row="4" Grid.Column="1" Name="SetupReference" ItemsSource="{x:Static vm:SetupEditor.References}"
                 SelectedItem="{Binding Reference}" HorizontalAlignment="Stretch" />
 
-      <TextBlock Grid.Row="5" Text="Probing" VerticalAlignment="Center" />
+      <!-- Programs probe only the touch plate; the per-setup probe method is kept but hidden. -->
+      <TextBlock Grid.Row="5" Text="Probing" VerticalAlignment="Center" IsVisible="False" />
       <ComboBox Grid.Row="5" Grid.Column="1" Name="SetupProbe" ItemsSource="{x:Static vm:SetupEditor.ProbeMethods}"
-                SelectedItem="{Binding Probe}" HorizontalAlignment="Stretch" />
+                SelectedItem="{Binding Probe}" HorizontalAlignment="Stretch" IsVisible="False" />
 
       <TextBlock Grid.Row="6" Text="Stock face up" VerticalAlignment="Center" IsVisible="{Binding IsThreeAxis}" />
       <ComboBox Grid.Row="6" Grid.Column="1" Name="SetupFace" ItemsSource="{x:Static vm:SetupEditor.Faces}"

@@ -1,5 +1,6 @@
 using System.Diagnostics;
 
+using ThreeCTool.Core.Machines;
 using ThreeCTool.Feeder.Contracts;
 using ThreeCTool.Feeder.Service.Controller;
 using ThreeCTool.Feeder.Service.Security;
@@ -200,7 +201,7 @@ public sealed class JobManager : IHostedService, IDisposable
             }
 
             var runId = Guid.CreateVersion7().ToString("N");
-            var streamer = new JobStreamer(connection, file, journal, runId, StreamerOptions(identity));
+            var streamer = new JobStreamer(connection, file, journal, runId, StreamerOptions(identity)) { AskOperator = AskOperatorAsync };
             var problems = streamer.Validate();
             if (problems.Count > 0)
             {
@@ -267,7 +268,7 @@ public sealed class JobManager : IHostedService, IDisposable
         return streamer.State switch
         {
             JobState.Paused => streamer.ResumeAsync(),
-            JobState.ProgramPaused => throw new FeederStateException("The program is paused at an M0: confirm the prompt on the feeder."),
+            JobState.ProgramPaused => throw new FeederStateException("The program is waiting for the operator: answer the prompt on the feeder."),
             _ => throw new FeederStateException("The job is not paused."),
         };
     }
@@ -358,6 +359,16 @@ public sealed class JobManager : IHostedService, IDisposable
                 throw new FeederStateException($"The run cannot be resumed ({plan.Action}): {string.Join(" ", plan.Notes)}");
             }
 
+            // The recovery moves use the safe Z too: check it and the file before anything moves.
+            using (var check = new JobStreamer(connection, file, journal, run.Id, StreamerOptions(identity)) { AskOperator = AskOperatorAsync })
+            {
+                var problems = check.Validate();
+                if (problems.Count > 0)
+                {
+                    throw new FeederStateException("The job cannot be resumed: " + string.Join(" ", problems.Take(5)));
+                }
+            }
+
             var job = store.Get(run.JobId);
             var analysis = await store.GetAnalysisAsync(run.JobId, cancellationToken).ConfigureAwait(false);
             var context = new RunContext(run, job, file, analysis) { Recovering = true };
@@ -383,6 +394,36 @@ public sealed class JobManager : IHostedService, IDisposable
         database.UpdateRun(run with { Recoverable = false, FeedbackPending = true });
         journal.AddEvent(run.Id, new JobEvent(time.GetUtcNow(), JobEventKinds.Recovery, null, "Recovery discarded by the operator"), flush: true);
         RefreshFlags();
+    }
+
+    /// <summary>Deletes a job that is not running; a run of it that could still be recovered is discarded.</summary>
+    public async Task DeleteJobAsync(string jobId, CancellationToken cancellationToken)
+    {
+        await startGate.WaitAsync(cancellationToken).ConfigureAwait(false);
+        try
+        {
+            store.Get(jobId);
+            lock (gate)
+            {
+                if (active?.Row.JobId == jobId)
+                {
+                    throw new FeederStateException("The job is running; stop it before deleting it.");
+                }
+            }
+
+            if (database.LatestRecoverableRun() is { } run && run.JobId == jobId)
+            {
+                database.UpdateRun(run with { Recoverable = false, FeedbackPending = true });
+                journal.AddEvent(run.Id, new JobEvent(time.GetUtcNow(), JobEventKinds.Recovery, null, "Recovery discarded: the job was deleted"), flush: true);
+            }
+
+            store.Delete(jobId);
+            RefreshFlags();
+        }
+        finally
+        {
+            startGate.Release();
+        }
     }
 
     public ActiveJob? Snapshot()
@@ -521,12 +562,19 @@ public sealed class JobManager : IHostedService, IDisposable
         startGate.Dispose();
     }
 
-    private JobStreamerOptions StreamerOptions(ControllerIdentity identity) => new()
+    private JobStreamerOptions StreamerOptions(ControllerIdentity identity)
     {
-        UseLineNumbers = identity.Config?.UseLineNumbers ?? false,
-        PlannerBlocks = identity.PlannerBlocks,
-        SafeZMachine = settings.Current.SafeZMachine,
-    };
+        // The low end of the Z travel is the collet nut on the table.
+        var travel = identity.Config?.Axes().FirstOrDefault(a => a.Axis == AxisName.Z)?.Travel();
+        return new()
+        {
+            UseLineNumbers = identity.Config?.UseLineNumbers ?? false,
+            PlannerBlocks = identity.PlannerBlocks,
+            SafeZMachine = settings.Current.SafeZMachine,
+            MachineZTravel = travel,
+            TableMachineZ = travel?.Low,
+        };
+    }
 
     private RecoveryOptions RecoveryOptionsFromSettings()
     {
@@ -570,9 +618,8 @@ public sealed class JobManager : IHostedService, IDisposable
                 return;
             }
 
-            var streamer = new JobStreamer(connection, context.File, journal, context.Row.Id, StreamerOptions(identity));
+            var streamer = new JobStreamer(connection, context.File, journal, context.Row.Id, StreamerOptions(identity)) { AskOperator = AskOperatorAsync };
             context.Recovering = false;
-            context.LastPromptLine = resume.Line - 1;
             context.Row = context.Row with { EndedAt = null, State = nameof(JobState.Running), Recoverable = false };
             database.UpdateRun(context.Row);
             Begin(context, streamer, resume.Line, resume.FirstLinePrefix);
@@ -621,7 +668,7 @@ public sealed class JobManager : IHostedService, IDisposable
         context.Streamer = streamer;
         context.PromptCancellation = new CancellationTokenSource();
         streamer.StateChanged += (_, state) => OnStreamerState(context, state);
-        streamer.PromptRequested += (_, message) => OnProgramPause(context, streamer, message);
+        streamer.PromptRequested += (_, prompt) => OnProgramPause(context, streamer, prompt);
         context.Task = Task.Run(async () =>
         {
             JobState final;
@@ -681,21 +728,22 @@ public sealed class JobManager : IHostedService, IDisposable
         Changed?.Invoke(this, EventArgs.Empty);
     }
 
-    private void OnProgramPause(RunContext context, JobStreamer streamer, string message)
+    /// <summary>Yes/No question from the program, answered on the touch screen; cancelling stops the job.</summary>
+    private async Task<bool?> AskOperatorAsync(JobQuestion question, CancellationToken cancellationToken)
     {
-        var lastSent = streamer.Progress.LastSent;
-        var line = context.Analysis.PauseLines.FirstOrDefault(l => l > context.LastPromptLine && l <= lastSent);
-        if (line == 0)
-        {
-            line = lastSent;
-        }
+        var prompt = new Prompt { Kind = PromptKind.Choice, Message = question.Text, CanCancel = true, Line = question.Line };
+        var answer = await prompts.AskAsync(prompt, cancellationToken).ConfigureAwait(false);
+        return answer.Confirmed ? answer.Choice : null;
+    }
 
-        context.LastPromptLine = line;
+    private void OnProgramPause(RunContext context, JobStreamer streamer, JobPrompt pause)
+    {
+        var line = pause.Line;
         var spindle = context.Analysis.SpindlePrompts.TryGetValue(line, out var rpm);
         var prompt = new Prompt
         {
             Kind = spindle ? PromptKind.Spindle : PromptKind.ProgramPause,
-            Message = message,
+            Message = pause.Message,
             SuggestedRpm = spindle ? rpm : 0,
             CanCancel = true,
             Line = line,
@@ -834,8 +882,6 @@ public sealed class JobManager : IHostedService, IDisposable
         public volatile bool Recovering;
 
         public volatile string? Message;
-
-        public int LastPromptLine { get; set; }
 
         public CancellationTokenSource RecoveryCancellation { get; } = new();
 

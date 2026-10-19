@@ -41,6 +41,7 @@ public sealed partial class JobsViewModel(IFeederShell shell) : ViewModelBase
 {
     private int previewRequest;
     private string? activeJobId;
+    private string? recoverableJobId;
     private bool reachable;
 
     public ObservableCollection<JobItemViewModel> Jobs { get; } = [];
@@ -70,6 +71,7 @@ public sealed partial class JobsViewModel(IFeederShell shell) : ViewModelBase
     {
         var active = status?.Job is { } job && RunViewModel.IsActiveState(job.State);
         var newActiveJobId = active ? status!.Job.JobId : null;
+        recoverableJobId = status is { RecoveryAvailable: true, Job: { } last } ? last.JobId : null;
         if (newActiveJobId != activeJobId || reachable != (status is not null))
         {
             activeJobId = newActiveJobId;
@@ -145,8 +147,15 @@ public sealed partial class JobsViewModel(IFeederShell shell) : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanDelete))]
     private async Task DeleteAsync()
     {
-        if (Selected is { } job
-            && await shell.ConfirmAsync("Delete job", $"Delete '{job.Name}' from the feeder?", "Delete", danger: true)
+        if (Selected is not { } job)
+        {
+            return;
+        }
+
+        var message = job.Info.Recoverable || job.Id == recoverableJobId
+            ? $"Delete '{job.Name}' from the feeder?\n\nIts interrupted run can then no longer be recovered."
+            : $"Delete '{job.Name}' from the feeder?";
+        if (await shell.ConfirmAsync("Delete job", message, "Delete", danger: true)
             && await shell.RunAsync(async () => await shell.Client.DeleteJobAsync(new JobRef { JobId = job.Id })))
         {
             await RefreshAsync();

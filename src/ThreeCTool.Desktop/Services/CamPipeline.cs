@@ -43,6 +43,9 @@ public sealed class CamPipeline : IDisposable
 
     private const int MaxPieceParts = 256;
 
+    /// <summary>Gap (mm) between the tool and the stock needed to offer the touch plate on the bed at X0 Y0.</summary>
+    private const double BedSpotMargin = 5;
+
     private readonly ProjectSession session;
     private readonly ComputeService compute;
     private readonly TimeProvider time;
@@ -470,7 +473,7 @@ public sealed class CamPipeline : IDisposable
                     FileIndex = group.FileIndex,
                     Piece = piece.Number == 0 ? null : piece,
                     PieceCount = pieceCount,
-                    TouchPlate = TouchPlateSpot.FromStockBounds(operations[0].Toolpath.Frame, stockBounds, stockRadius),
+                    TouchPlate = TouchPlateSpot.FromStockBounds(operations[0].Toolpath.Frame, stockBounds, stockRadius, (group.Tool.Diameter / 2) + BedSpotMargin),
                     Verification = report,
                     OverrideVerification = overrideVerification,
                     InputHashes = hashes,
@@ -689,6 +692,7 @@ public sealed class CamPipeline : IDisposable
         var input = new
         {
             Generator = GeneratorVersion,
+            ToolpathGenerator.Revision,
             Operation = new { operation.Strategy, operation.ToolId, operation.Parameters },
             Setup = SetupCopy(operation.SetupId),
             Tool = tool,

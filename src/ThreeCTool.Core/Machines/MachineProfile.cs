@@ -103,6 +103,12 @@ public sealed class AxisConfig
     public bool HomingPositiveDirection { get; set; }
 
     public double HomingMachinePosition { get; set; }
+
+    /// <summary>Machine-coordinate travel from the homing position and <see cref="MaxTravel"/>; null when the travel is not configured.</summary>
+    public (double Low, double High)? Travel() =>
+        MaxTravel > 0
+            ? HomingPositiveDirection ? (HomingMachinePosition - MaxTravel, HomingMachinePosition) : (HomingMachinePosition, HomingMachinePosition + MaxTravel)
+            : null;
 }
 
 public sealed class SpindleConfig

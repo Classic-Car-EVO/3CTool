@@ -152,6 +152,18 @@ public sealed class MachineControlTests
     }
 
     [Fact]
+    public async Task ControllerRestartWhileConnecting_IsIdentifiedOnTheSameConnection()
+    {
+        await using var feeder = await FeederHarness.StartAsync(new SimulatorOptions { TimeScale = 100, RestartOnFirstLine = true });
+
+        var status = await feeder.WaitStatusAsync(s => s.MachineState == "Idle");
+        Assert.Equal(ConnectionState.Connected, status.Connection);
+        Assert.Contains("3.9.5", status.Firmware, StringComparison.Ordinal);
+        Assert.Equal(2, feeder.Simulator.ReceivedLines.Count(l => l == "$I"));
+        Assert.Equal(1, feeder.Server.ConnectionCount);
+    }
+
+    [Fact]
     public async Task Disconnected_ManualCommandsAreUnavailable()
     {
         await using var feeder = await FeederHarness.StartAsync(home: false);

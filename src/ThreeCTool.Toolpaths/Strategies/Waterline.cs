@@ -16,7 +16,7 @@ internal static class Waterline
         var partTop = (double)context.Setup.PartBounds.Max.Z;
         var top = Math.Min(settings.MaxZ ?? partTop, partTop);
         var bottom = Math.Max(context.FinishingFloor, context.Setup.PartBounds.Min.Z);
-        var levels = Refine(context, context.Levels(top, bottom, settings.Stepdown, flats: false));
+        var levels = Refine(context, StrategyContext.Levels(top, bottom, settings.Stepdown));
         builder.StayDownLink = (a, b) => context.SurfaceLink(a, b, Math.Max(2 * settings.Stepover, context.Radius));
         for (var i = 0; i < levels.Count; i++)
         {

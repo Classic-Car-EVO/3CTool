@@ -11,5 +11,11 @@
     <Product>3C Tool</Product>
     <Company>TenTwenty Media BV</Company>
     <Copyright>Copyright (c) 2026 TenTwenty Media BV</Copyright>
+    <!--
+      Methods with loops are compiled fully optimized up front instead of quick-jitted and patched mid-loop by
+      on-stack replacement: the .NET 10 (10.0.12) OSR code silently skipped the inner loop of the simulator's move
+      expansion after a few thousand iterations, so only the first moves of a toolpath removed material.
+    -->
+    <TieredCompilationQuickJitForLoops>false</TieredCompilationQuickJitForLoops>
   </PropertyGroup>
 </Project>

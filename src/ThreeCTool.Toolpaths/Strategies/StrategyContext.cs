@@ -126,9 +126,9 @@ internal sealed class StrategyContext
 
     /// <summary>
     /// Evenly spaced levels from <paramref name="top"/> (exclusive) down to <paramref name="bottom"/> (inclusive) with
-    /// steps of at most <paramref name="step"/>, plus levels on flat part faces (offset by the axial stock).
+    /// steps of at most <paramref name="step"/>.
     /// </summary>
-    public List<double> Levels(double top, double bottom, double step, bool flats)
+    public static List<double> Levels(double top, double bottom, double step)
     {
         var levels = new List<double>();
         if (top - bottom < 1e-6)
@@ -142,21 +142,44 @@ internal sealed class StrategyContext
             levels.Add(top - ((top - bottom) * k / count));
         }
 
-        if (flats)
+        return levels;
+    }
+
+    /// <summary>
+    /// Clearing levels, top down: the even <see cref="Levels"/> plus a level on each flat part face (offset by the axial
+    /// stock) that no even level already cuts within the tolerance. Flats closer than the tolerance share one level.
+    /// </summary>
+    public List<ClearingLevel> ClearingLevels(double top, double bottom, double step)
+    {
+        var even = Levels(top, bottom, step);
+        var levels = even.Select(z => new ClearingLevel(z, null)).ToList();
+        double? kept = null;
+        foreach (var flat in FlatHeights().Select(h => h + Settings.AxialStock).OrderDescending())
         {
-            foreach (var flat in FlatHeights())
+            if (flat > top - Tolerance || flat <= bottom + 1e-3 || flat > kept - Tolerance
+                || even.Any(z => z >= flat - 2e-3 && z <= flat + Tolerance))
             {
-                var z = flat + Settings.AxialStock;
-                if (z < top - 1e-3 && z > bottom + 1e-3 && levels.All(l => Math.Abs(l - z) > 0.01))
-                {
-                    levels.Add(z);
-                }
+                continue;
             }
 
-            levels.Sort((a, b) => b.CompareTo(a));
+            kept = flat;
+            levels.Add(new ClearingLevel(flat, even.First(z => z < flat)));
         }
 
+        levels.Sort((a, b) => b.Z.CompareTo(a.Z));
         return levels;
+    }
+
+    /// <summary>
+    /// Tip area of a clearing level. A flat level only takes what the even level below it cannot reach (the flat
+    /// faces and their surroundings); the rest of its material is cut by that level within the stepdown.
+    /// </summary>
+    public PathsD LevelRegion(ClearingLevel level)
+    {
+        var region = ClearingRegion(level.Z);
+        return level.Below is { } below
+            ? Polygons.Open(Polygons.Difference(region, ClearingRegion(below)), Tolerance, Tolerance)
+            : region;
     }
 
     /// <summary>Heights of upward-facing flat part faces.</summary>
@@ -247,4 +270,10 @@ internal sealed class StrategyContext
             ? Polygons.Offset(Setup.PartSilhouette, offset, Tolerance)
             : Polygons.Offset(Setup.StockFootprint, Radius + offset, Tolerance);
     }
+}
+
+/// <summary>A clearing height; a flat level names the even level <paramref name="Below"/> that clears the rest under it.</summary>
+internal readonly record struct ClearingLevel(double Z, double? Below)
+{
+    public bool IsFlat => Below is not null;
 }

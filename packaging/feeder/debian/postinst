@@ -2,9 +2,10 @@
 set -e
 
 if [ "$1" = configure ]; then
-    if ! getent passwd 3ctool-feeder >/dev/null; then
+    # adduser rejects names starting with a digit, hence not "3ctool-feeder".
+    if ! getent passwd threectool-feeder >/dev/null; then
         adduser --system --group --home /var/lib/3ctool-feeder --no-create-home \
-            --gecos "3C Tool feeder" 3ctool-feeder >/dev/null
+            --gecos "3C Tool feeder" threectool-feeder >/dev/null
     fi
 fi
 
@@ -12,9 +13,16 @@ if [ -d /run/systemd/system ]; then
     systemctl daemon-reload >/dev/null || true
     if [ "$1" = configure ]; then
         systemctl enable 3ctool-feederd.service 3ctool-feeder-ui.service >/dev/null || true
+        systemctl enable --now 3ctool-feeder-maintenance@console.path 3ctool-feeder-maintenance@reboot.path \
+            3ctool-feeder-maintenance@poweroff.path >/dev/null 2>&1 || true
         # On upgrade a running job is stopped; it shows up as recoverable after the restart.
         systemctl restart 3ctool-feederd.service || true
         systemctl restart 3ctool-feeder-ui.service || true
+        if [ "$(systemctl get-default 2>/dev/null)" = graphical.target ] \
+            && systemctl is-enabled display-manager.service >/dev/null 2>&1; then
+            echo "3ctool-feeder: a desktop starts at boot and keeps the touch UI off the screen." >&2
+            echo "3ctool-feeder: boot to the console: sudo systemctl set-default multi-user.target && sudo reboot" >&2
+        fi
     fi
 fi
 

@@ -226,18 +226,31 @@
 
         <Border DockPanel.Dock="Bottom" Classes="card" IsVisible="{Binding Playback.IsAvailable}">
           <StackPanel Spacing="4">
-            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto">
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto" IsEnabled="{Binding Playback.CanControl}">
               <Button Content="|&lt;" Command="{Binding Playback.ToStartCommand}" ToolTip.Tip="Start" Margin="0,0,4,0" />
-              <Button Content="&lt;&lt;" Command="{Binding Playback.PreviousStepCommand}" ToolTip.Tip="Previous operation" Margin="0,0,4,0" />
-              <Button Name="PlayPause" Content="Play/Pause" Command="{Binding Playback.PlayPauseCommand}" Margin="0,0,4,0" />
-              <Button Content="&gt;&gt;" Command="{Binding Playback.NextStepCommand}" ToolTip.Tip="Next operation" Margin="0,0,4,0" />
-              <Button Content="&gt;|" Command="{Binding Playback.ToEndCommand}" ToolTip.Tip="End" Margin="0,0,8,0" />
+              <Button Grid.Column="1" Content="&lt;&lt;" Command="{Binding Playback.PreviousStepCommand}" ToolTip.Tip="Previous operation" Margin="0,0,4,0" />
+              <Button Grid.Column="2" Name="PlayPause" Content="Play/Pause" Command="{Binding Playback.PlayPauseCommand}" Margin="0,0,4,0" />
+              <Button Grid.Column="3" Content="&gt;&gt;" Command="{Binding Playback.NextStepCommand}" ToolTip.Tip="Next operation" Margin="0,0,4,0" />
+              <Button Grid.Column="4" Content="&gt;|" Command="{Binding Playback.ToEndCommand}" ToolTip.Tip="End" Margin="0,0,8,0" />
               <Slider Grid.Column="5" Name="PlaybackTime" Minimum="0" Maximum="{Binding Playback.Duration}" Value="{Binding Playback.Time}" VerticalAlignment="Center" />
               <ComboBox Grid.Column="6" ItemsSource="{x:Static vm:PlaybackViewModel.Speeds}" SelectedItem="{Binding Playback.Speed}" Margin="8,0,0,0" />
             </Grid>
             <Grid ColumnDefinitions="*,Auto">
               <TextBlock Name="PlaybackPosition" Text="{Binding Playback.PositionText}" Classes="muted" FontSize="12" VerticalAlignment="Center" />
               <CheckBox Grid.Column="1" Name="ShowDeviation" Content="Deviation heatmap" IsChecked="{Binding Playback.ShowDeviation}" IsEnabled="{Binding Playback.HasDeviation}" />
+            </Grid>
+            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto" ToolTip.Tip="Records the whole job with the current camera view (needs ffmpeg).">
+              <TextBlock Text="Video" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <ComboBox Grid.Column="1" Name="VideoSize" ItemsSource="{x:Static vm:PlaybackViewModel.VideoSizes}" SelectedItem="{Binding Playback.VideoSize}"
+                        IsEnabled="{Binding Playback.CanControl}" Margin="0,0,4,0" />
+              <ComboBox Grid.Column="2" Name="VideoLength" ItemsSource="{x:Static vm:PlaybackViewModel.VideoLengths}" SelectedItem="{Binding Playback.VideoLength}"
+                        IsEnabled="{Binding Playback.CanControl}" Margin="0,0,4,0" />
+              <ComboBox Grid.Column="3" Name="VideoFrameRate" ItemsSource="{x:Static vm:PlaybackViewModel.FrameRates}" SelectedItem="{Binding Playback.FrameRate}"
+                        IsEnabled="{Binding Playback.CanControl}" Margin="0,0,8,0" />
+              <ProgressBar Grid.Column="4" Value="{Binding Playback.ExportProgress}" Minimum="0" Maximum="100" ShowProgressText="True"
+                           IsVisible="{Binding Playback.IsExporting}" VerticalAlignment="Center" Margin="0,0,8,0" />
+              <Button Grid.Column="5" Name="ExportVideo" Content="Export MP4..." Command="{Binding Playback.ExportVideoCommand}" IsVisible="{Binding Playback.CanControl}" />
+              <Button Grid.Column="5" Name="CancelExport" Content="Cancel export" Command="{Binding Playback.CancelExportCommand}" IsVisible="{Binding Playback.IsExporting}" />
             </Grid>
           </StackPanel>
         </Border>

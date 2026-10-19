@@ -1,0 +1,12 @@
+#!/bin/sh
+# Runs as root from 3ctool-feeder-maintenance@<action>.service once the daemon writes <action>.request.
+set -e
+
+rm -f "/run/3ctool-feeder/$1.request"
+case "$1" in
+    # Starting the console login stops the touch UI (Conflicts=getty@tty1.service).
+    console) exec systemctl start --no-block getty@tty1.service ;;
+    reboot) exec systemctl reboot ;;
+    poweroff) exec systemctl poweroff ;;
+    *) echo "Unknown maintenance action '$1'." >&2; exit 2 ;;
+esac

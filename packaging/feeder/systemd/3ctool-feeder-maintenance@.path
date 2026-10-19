@@ -1,0 +1,8 @@
+[Unit]
+Description=3C Tool feeder: watch for %i requests from the touch screen
+
+[Path]
+PathExists=/run/3ctool-feeder/%i.request
+
+[Install]
+WantedBy=multi-user.target

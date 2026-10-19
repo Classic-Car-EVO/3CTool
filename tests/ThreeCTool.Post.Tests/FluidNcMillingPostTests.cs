@@ -27,11 +27,12 @@ public sealed class FluidNcMillingPostTests
             "(Collet: ER11 6)",
             "(Material: Aluminium)",
             "(Spindle: 18000 RPM)",
-            "(Probe: touch plate, first file of the setup)",
+            "(Probe: touch plate on the material at X20 Y15, or on the bed at X0 Y0 if chosen at the machine)",
             "(Operations: Contour)",
             "(Estimated time: 00:02:05)",
             "(Generator: 3C Tool 9.9.9)",
             "(Input toolpaths: abc)",
+            "(MC:TOOL STICKOUT 20)",
             "G21 G90 G94 G17 G91.1 G54",
             "G53 G0 Z-5",
             "M5 M9",
@@ -40,14 +41,26 @@ public sealed class FluidNcMillingPostTests
             "(MC:PROBE BEGIN TOUCHPLATE)",
             "G49",
             "G53 G0 Z-5",
+            "(Probe the touch plate on the bed at X0 Y0? Yes: plate on the bed at X0 Y0. No: plate on the material at X20 Y15)",
+            "(MC:ASK BEGIN)",
+            "G0 X0 Y0",
+            "(Place the touch plate on the bed at X0 Y0 under the tool, at most 80 mm below it, and attach the probe clip)",
+            "M0",
+            "G91 G38.2 Z-80 F200",
+            "G0 Z2",
+            "G38.2 Z-4 F25",
+            "G90",
+            "G10 L20 P1 Z-10",
+            "(MC:ASK ELSE)",
             "G0 X20 Y15",
-            "(Place the touch plate on the stock under the tool, at most 80 mm below it, and attach the probe clip)",
+            "(Place the touch plate on the material at X20 Y15 under the tool, at most 80 mm below it, and attach the probe clip)",
             "M0",
             "G91 G38.2 Z-80 F200",
             "G0 Z2",
             "G38.2 Z-4 F25",
             "G90",
             "G10 L20 P1 Z10",
+            "(MC:ASK END)",
             "G53 G0 Z-5",
             "(MC:PROBE END)",
             "(Remove the touch plate and the probe clip)",
@@ -89,61 +102,20 @@ public sealed class FluidNcMillingPostTests
     }
 
     [Fact]
-    public void Post_ToolSetterFirstFile_SetsWorkZAndStoresTheSetterReference()
+    public void Post_ToolSetterSetup_ProbesOnlyTheTouchPlate()
     {
-        var setup = PostFixture.Setup(method: ProbeMethod.ToolSetter);
-        var lines = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup)).Lines.ToList();
+        var setup = PostFixture.Setup(method: ProbeMethod.ToolSetter, workOffset: WorkOffset.G59);
+        var expected = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), PostFixture.Setup(workOffset: WorkOffset.G59))).Lines.Skip(1);
 
-        string[] setterProbe =
-        [
-            "G53 G0 Z-5",
-            "G53 G0 X50 Y50",
-            "G53 G0 Z-5",
-            "G91 G38.2 Z-80 F200",
-            "G0 Z2",
-            "G38.2 Z-4 F25",
-            "G90",
-        ];
-        string[] expected =
-        [
-            "(MC:PROBE BEGIN TOUCHPLATE)",
-            "G49",
-            "G53 G0 Z-5",
-            "G0 X20 Y15",
-            "(Place the touch plate on the stock under the tool, at most 80 mm below it, and attach the probe clip)",
-            "M0",
-            "G91 G38.2 Z-80 F200",
-            "G0 Z2",
-            "G38.2 Z-4 F25",
-            "G90",
-            "G10 L20 P1 Z10",
-            .. setterProbe,
-            "G10 L2 P6 Z[#5063]",
-            "G53 G0 Z-5",
-            "(MC:PROBE END)",
-            "(Remove the touch plate and the probe clip)",
-            "M0",
-            "(MC:PROBE BEGIN)",
-            .. setterProbe,
-            "G43.1 Z[#5063-#5323]",
-            "G53 G0 Z-5",
-            "(MC:PROBE END)",
-            "M3 S18000",
-        ];
-        var start = lines.IndexOf("(MC:PROBE BEGIN TOUCHPLATE)");
-        Assert.Equal(expected, lines.Skip(start).Take(expected.Length));
-    }
+        foreach (var first in new[] { true, false })
+        {
+            var lines = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup, first: first)).Lines;
+            Assert.Single(lines, "(MC:PROBE BEGIN TOUCHPLATE)");
+            Assert.DoesNotContain(lines, l => l.Contains("G43.1", StringComparison.Ordinal) || l.Contains('#') || l.Contains("X50 Y50", StringComparison.Ordinal));
+            Assert.Equal(2, lines.Count(l => l.StartsWith("G91 G38.2", StringComparison.Ordinal)));
+        }
 
-    [Fact]
-    public void Post_ToolSetterLaterFile_OnlyMeasuresTheToolLength()
-    {
-        var setup = PostFixture.Setup(method: ProbeMethod.ToolSetter);
-        var lines = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup, first: false)).Lines;
-
-        Assert.DoesNotContain("(MC:PROBE BEGIN TOUCHPLATE)", lines);
-        Assert.DoesNotContain(lines, l => l.StartsWith("G10", StringComparison.Ordinal));
-        Assert.Single(lines, "(MC:PROBE BEGIN)");
-        Assert.Single(lines, "G43.1 Z[#5063-#5323]");
+        Assert.Equal(expected, post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup)).Lines.Skip(1));
     }
 
     [Fact]
@@ -153,6 +125,7 @@ public sealed class FluidNcMillingPostTests
 
         Assert.Single(lines, "(MC:PROBE BEGIN TOUCHPLATE)");
         Assert.Contains("G10 L20 P1 Z10", lines);
+        Assert.Contains("G10 L20 P1 Z-10", lines);
         Assert.DoesNotContain(lines, l => l.StartsWith("G43.1", StringComparison.Ordinal));
     }
 
@@ -168,6 +141,12 @@ public sealed class FluidNcMillingPostTests
         Assert.Contains("G21 G90 G94 G17 G91.1 G56", lines);
         Assert.Contains("G0 X1 Y2", lines);
         Assert.Contains("G10 L20 P3 Z9.5", lines);
+        Assert.DoesNotContain("(MC:ASK BEGIN)", lines);
+
+        var bed = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), setup, machine: machine,
+            touchPlate: new TouchPlateSpot(1, 2, -3, -25))).Lines;
+        Assert.Contains("G10 L20 P3 Z-12.5", bed);
+        Assert.Contains("G10 L20 P3 Z9.5", bed);
     }
 
     [Fact]
@@ -197,6 +176,7 @@ public sealed class FluidNcMillingPostTests
 
         var plate = lines.IndexOf("(MC:PROBE BEGIN TOUCHPLATE)");
         Assert.Equal(["G49", "G53 G0 Z-5", "G0 A90", "X20 Y15"], lines.Skip(plate + 1).Take(4));
+        Assert.DoesNotContain("(MC:ASK BEGIN)", lines);
         var operation = lines.FindIndex(l => l.StartsWith("(Operation:", StringComparison.Ordinal));
         Assert.Equal(["G53 G0 Z-5", "G0 X0 Y0 A90", "Z30", "G1 Z20 F300", "X10 F1000", "G0 Z30"], lines.Skip(operation + 1).Take(6));
         Assert.Contains("(Setup 1: Top, G54, indexed A90)", lines);
@@ -347,7 +327,6 @@ public sealed class FluidNcMillingPostTests
         var moves = PostFixture.SimpleMoves();
         Assert.Throws<PostException>(() => post.Post(PostFixture.Request(moves, rpm: 40000)));
         Assert.Throws<PostException>(() => post.Post(PostFixture.Request(moves, rpm: 1000)));
-        Assert.Throws<PostException>(() => post.Post(PostFixture.Request(moves, PostFixture.Setup(method: ProbeMethod.ToolSetter, workOffset: WorkOffset.G59))));
 
         var noPlate = PostFixture.Request(moves);
         Assert.Throws<PostException>(() => post.Post(new MillingPostRequest
@@ -403,9 +382,6 @@ public sealed class FluidNcMillingPostTests
         Assert.Throws<PostException>(() => post.Post(PostFixture.Request(wide)));
 
         // Machine-coordinate targets.
-        var setter = PostFixture.Machine();
-        setter.Probe.ToolSetterX = -10;
-        Assert.Throws<PostException>(() => post.Post(PostFixture.Request(moves, PostFixture.Setup(method: ProbeMethod.ToolSetter), machine: setter)));
         var safe = PostFixture.Machine();
         safe.SafeZMachine = 5;
         Assert.Throws<PostException>(() => post.Post(PostFixture.Request(moves, machine: safe)));
@@ -423,11 +399,10 @@ public sealed class FluidNcMillingPostTests
     {
         var machine = PostFixture.Machine();
         machine.Probe.MaxDistance = 1000;
-        machine.Probe.ToolSetterStartZ = -600;
-        var lines = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), PostFixture.Setup(method: ProbeMethod.ToolSetter), machine: machine)).Lines;
+        var lines = post.Post(PostFixture.Request(PostFixture.SimpleMoves(), machine: machine)).Lines;
 
-        Assert.Contains("G91 G38.2 Z-645 F200", lines);
-        Assert.Contains("G91 G38.2 Z-50 F200", lines);
+        // Down to the table, less the 20 mm stickout.
+        Assert.Equal(2, lines.Count(l => l == "G91 G38.2 Z-625 F200"));
     }
 
     [Fact]
@@ -470,14 +445,27 @@ public sealed class FluidNcMillingPostTests
         Assert.Equal(0, spot.X, 9);
         Assert.Equal(0, spot.Y, 9);
         Assert.Equal(40, spot.SurfaceZ, 9);
+        Assert.Null(spot.BedZ);
     }
 
     [Fact]
     public void FromStockBounds_ThreeAxis_IsTheStockTopCentre()
     {
+        // The origin X0 Y0 lies on the stock, so the bed there is not reachable for the touch plate.
         var frame = new SetupFrame(SetupOrientation.ThreeAxis, 10, 20, 30, 0);
         var spot = TouchPlateSpot.FromStockBounds(frame, new Geometry.BoundingBox(new Vector3(0, 0, 0), new Vector3(100, 60, 40)));
         Assert.Equal(new TouchPlateSpot(40, 10, 10), spot);
+    }
+
+    [Fact]
+    public void FromStockBounds_OriginOffTheStock_OffersTheBedOnlyWithClearance()
+    {
+        // The origin is 20 mm left of and 10 mm in front of the stock: 22.4 mm from its footprint.
+        var frame = new SetupFrame(SetupOrientation.ThreeAxis, -20, -10, 40, 0);
+        var bounds = new Geometry.BoundingBox(new Vector3(0, 0, 0), new Vector3(100, 60, 40));
+
+        Assert.Equal(new TouchPlateSpot(70, 40, 0, -40), TouchPlateSpot.FromStockBounds(frame, bounds, clearance: 20));
+        Assert.Null(TouchPlateSpot.FromStockBounds(frame, bounds, clearance: 25).BedZ);
     }
 
     [Fact]
@@ -487,6 +475,7 @@ public sealed class FluidNcMillingPostTests
         var level = TouchPlateSpot.FromStockBounds(new SetupFrame(SetupOrientation.Indexed, 0, 0, 0, 0), bounds);
         Assert.Equal(50, level.X, 9);
         Assert.Equal(10, level.SurfaceZ, 9);
+        Assert.Null(level.BedZ);
 
         var turned = TouchPlateSpot.FromStockBounds(new SetupFrame(SetupOrientation.Indexed, 0, 0, 0, 90), bounds);
         Assert.Equal(20, turned.SurfaceZ, 9);

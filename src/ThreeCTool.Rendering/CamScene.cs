@@ -184,6 +184,25 @@ public sealed class CamScene : IOrbitScene
 
     public void Invalidate() => Changed?.Invoke(this, EventArgs.Empty);
 
+    /// <summary>Independent copy of the content, display state and camera (for rendering off screen).</summary>
+    public CamScene Clone()
+    {
+        var copy = new CamScene
+        {
+            Aspect = Aspect,
+            meshes = meshes,
+            points = points,
+            toolpaths = toolpaths,
+            selected = selected,
+            progress = progress,
+            tool = tool,
+            showRapids = showRapids,
+        };
+        copy.hidden.UnionWith(hidden);
+        copy.Camera.CopyFrom(Camera);
+        return copy;
+    }
+
     private Vector4 Dim(Vector4 color, Guid id) =>
         selected is { } s && s != id ? color with { W = color.W * DimFactor } : color;
 

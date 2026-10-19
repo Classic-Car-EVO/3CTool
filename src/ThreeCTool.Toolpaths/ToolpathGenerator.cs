@@ -7,6 +7,9 @@ namespace ThreeCTool.Toolpaths;
 /// <summary>Generates the toolpath of one operation.</summary>
 public static class ToolpathGenerator
 {
+    /// <summary>Bumped when the generated toolpaths change, so cached ones are regenerated.</summary>
+    public const int Revision = 2;
+
     public static Toolpath Generate(ToolpathRequest request, IProgress<double>? progress = null, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(request);

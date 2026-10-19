@@ -122,6 +122,22 @@ public sealed class RecoveryPlannerTests : IDisposable
     }
 
     [Fact]
+    public async Task Plan_AfterTouchPlateBlock_DoesNotReprobe()
+    {
+        var lines = Jobs.Zigzag(60, probe: true).Lines;
+        lines[2] = "(MC:PROBE BEGIN TOUCHPLATE)";
+        var file = await WriteAsync(lines);
+
+        var after = RecoveryPlanner.Plan(file, Progress(file, 36), new RecoveryOptions());
+        Assert.Equal(35, after.ResumeLine);
+        Assert.Null(after.Probe);
+        Assert.Contains(after.Notes, n => n.Contains("restored from the recorded work offsets", StringComparison.Ordinal));
+
+        var inside = RecoveryPlanner.Plan(file, Progress(file, 6), new RecoveryOptions());
+        Assert.Equal(3, inside.ResumeLine);
+    }
+
+    [Fact]
     public async Task Plan_ResumeLineWithoutMotionWord_GetsPrefix()
     {
         var file = await WriteAsync(["G21 G90 G54", "G0 X0 Y0 Z5", "G1 Z-1 F300", "X10", "X20", "X30"]);

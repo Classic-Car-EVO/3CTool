@@ -53,6 +53,7 @@ public sealed class Simulator : IDisposable
     private PlannerBlock? current;
     private SimChannel? lineChannel;
     private bool okPending;
+    private readonly HashSet<SimChannel> restartedChannels = [];
     private bool critical;
     private int holdSub;
     private double holdTimer;
@@ -701,6 +702,17 @@ public sealed class Simulator : IDisposable
         if (text.Length == 0)
         {
             return "ok";
+        }
+
+        if (Options.RestartOnFirstLine && restartedChannels.Add(channel))
+        {
+            ResetVolatile();
+            IsHomed = false;
+            State = SimState.Alarm;
+            Broadcast(Banner);
+            Broadcast("[MSG:INFO: ALARM: Unhomed]");
+            Broadcast("ALARM:14");
+            return null;
         }
 
         if (text.StartsWith('$'))

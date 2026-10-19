@@ -8,8 +8,8 @@ fi
 # Purge removes the jobs, run journal, feedback, pairings and the TLS certificate.
 if [ "$1" = purge ]; then
     rm -rf /var/lib/3ctool-feeder /etc/3ctool-feeder
-    if getent passwd 3ctool-feeder >/dev/null; then
-        deluser --system 3ctool-feeder >/dev/null 2>&1 || true
+    if getent passwd threectool-feeder >/dev/null; then
+        deluser --system threectool-feeder >/dev/null 2>&1 || true
     fi
 fi
 

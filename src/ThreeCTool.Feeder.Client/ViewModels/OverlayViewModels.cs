@@ -29,6 +29,7 @@ public sealed partial class PromptViewModel : ViewModelBase
     {
         PromptKind.ProgramPause => "Program pause",
         PromptKind.Spindle => "Set the spindle speed",
+        PromptKind.Choice => "Question",
         _ => "Confirm",
     };
 
@@ -38,12 +39,18 @@ public sealed partial class PromptViewModel : ViewModelBase
 
     public bool IsSpindle => Prompt.Kind == PromptKind.Spindle;
 
+    /// <summary>Yes/No question: Confirm answers Yes, No answers No, Cancel stops the job.</summary>
+    public bool IsChoice => Prompt.Kind == PromptKind.Choice;
+
     public bool CanCancel => Prompt.CanCancel;
+
+    public string CancelText => IsChoice ? "Stop job" : "Cancel job step";
 
     public string ConfirmText => Prompt.Kind switch
     {
         PromptKind.ProgramPause => "Continue",
         PromptKind.Spindle => "Spindle running",
+        PromptKind.Choice => "Yes",
         _ => "Confirm",
     };
 
@@ -59,7 +66,7 @@ public sealed partial class PromptViewModel : ViewModelBase
 
     /// <summary>Set once answered; the prompt closes when the feeder clears it.</summary>
     [ObservableProperty]
-    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand))]
+    [NotifyCanExecuteChangedFor(nameof(ConfirmCommand), nameof(CancelCommand), nameof(NoCommand))]
     public partial bool Answered { get; set; }
 
     [RelayCommand]
@@ -84,6 +91,9 @@ public sealed partial class PromptViewModel : ViewModelBase
     [RelayCommand(CanExecute = nameof(CanAnswer))]
     private Task ConfirmAsync() => AnswerAsync(true);
 
+    [RelayCommand(CanExecute = nameof(CanAnswer))]
+    private Task NoAsync() => AnswerAsync(true, choice: false);
+
     [RelayCommand(CanExecute = nameof(CanAnswerCancel))]
     private Task CancelAsync() => AnswerAsync(false);
 
@@ -91,10 +101,10 @@ public sealed partial class PromptViewModel : ViewModelBase
 
     private bool CanAnswerCancel() => CanAnswer() && CanCancel;
 
-    private async Task AnswerAsync(bool confirmed)
+    private async Task AnswerAsync(bool confirmed, bool choice = true)
     {
         Answered = true;
-        var answer = new PromptAnswer { Id = Id, Confirmed = confirmed, Rpm = IsSpindle && confirmed ? Rpm : 0 };
+        var answer = new PromptAnswer { Id = Id, Confirmed = confirmed, Rpm = IsSpindle && confirmed ? Rpm : 0, Choice = IsChoice && confirmed && choice };
         if (!await shell.RunAsync(async () => await shell.Client.AnswerPromptAsync(answer)))
         {
             Answered = false;

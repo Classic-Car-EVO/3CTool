@@ -184,6 +184,7 @@ public sealed partial class MachineEditorViewModel : EditorViewModel<MachineProf
         ArgumentNullException.ThrowIfNull(config);
         var changes = Model.Axes.Count > 0 ? ProfileImport.Compare(Model, config) : [];
         ProfileImport.Apply(Model, config, null, importedAt);
+        SafeZ.Refresh();
         ImportChanges.Clear();
         foreach (var change in changes)
         {

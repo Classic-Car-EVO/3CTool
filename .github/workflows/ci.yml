@@ -22,6 +22,9 @@ jobs:
           global-json-file: global.json
       - run: dotnet restore ThreeCTool.slnx
       - run: dotnet build ThreeCTool.slnx --no-restore -c Release
+      # The video export tests need ffmpeg (they are skipped without it).
+      - if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
       # Hosted runners have no usable GPU; GPU tests run in gpu.yml on the self-hosted runner.
       # The timing-sensitive feeder tests run on their own so the CPU-heavy CAM and desktop tests don't starve them.
       - run: dotnet test tests/ThreeCTool.Feeder.Tests --no-build -c Release --filter "Category!=Gpu"

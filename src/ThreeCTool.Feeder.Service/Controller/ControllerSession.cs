@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using ThreeCTool.Core.Machines;
 using ThreeCTool.Feeder.Contracts;
 using ThreeCTool.Feeder.Service.Storage;
@@ -29,6 +30,9 @@ public sealed class ControllerSession(
     ILogger<ControllerSession> logger,
     Func<ConnectionSettings, ITransport>? transportFactory = null) : BackgroundService
 {
+    private const int IdentifyAttempts = 3;
+    private static readonly TimeSpan StartupQuiet = TimeSpan.FromSeconds(1);
+    private static readonly TimeSpan StartupQuietLimit = TimeSpan.FromSeconds(15);
     private readonly Lock gate = new();
     private readonly Func<ConnectionSettings, ITransport> createTransport = transportFactory ?? Transports.Create;
     private CancellationTokenSource? reconnect;
@@ -205,6 +209,53 @@ public sealed class ControllerSession(
 
     private static async Task<ControllerIdentity> IdentifyAsync(ControllerConnection connection, CancellationToken cancellationToken)
     {
+        for (var attempt = 1; ; attempt++)
+        {
+            try
+            {
+                return await IdentifyOnceAsync(connection, cancellationToken).ConfigureAwait(false);
+            }
+            catch (ControllerCommandException ex) when (ex.Result.Outcome == LineOutcome.Discarded && attempt < IdentifyAttempts)
+            {
+                // ESP32 boards reboot when the serial port opens; the start-up banner discards queries sent while booting.
+                await WaitForQuietAsync(connection, cancellationToken).ConfigureAwait(false);
+                if (connection.NeedsResync)
+                {
+                    await connection.ResynchronizeAsync(cancellationToken).ConfigureAwait(false);
+                }
+            }
+        }
+    }
+
+    /// <summary>Waits until the controller has sent nothing but status reports for <see cref="StartupQuiet"/>.</summary>
+    private static async Task WaitForQuietAsync(ControllerConnection connection, CancellationToken cancellationToken)
+    {
+        var last = Stopwatch.GetTimestamp();
+        void OnMessage(object? sender, ControllerMessage message)
+        {
+            if (message is not StatusMessage)
+            {
+                Interlocked.Exchange(ref last, Stopwatch.GetTimestamp());
+            }
+        }
+
+        var start = Stopwatch.GetTimestamp();
+        connection.MessageReceived += OnMessage;
+        try
+        {
+            while (Stopwatch.GetElapsedTime(Interlocked.Read(ref last)) < StartupQuiet && Stopwatch.GetElapsedTime(start) < StartupQuietLimit)
+            {
+                await Task.Delay(50, cancellationToken).ConfigureAwait(false);
+            }
+        }
+        finally
+        {
+            connection.MessageReceived -= OnMessage;
+        }
+    }
+
+    private static async Task<ControllerIdentity> IdentifyOnceAsync(ControllerConnection connection, CancellationToken cancellationToken)
+    {
         var warnings = new List<string>();
         await connection.WaitForStatusAsync(_ => true, connection.Options.CommandTimeout, cancellationToken).ConfigureAwait(false);
         var build = await connection.QueryBuildInfoAsync(cancellationToken).ConfigureAwait(false);
@@ -222,7 +273,7 @@ public sealed class ControllerSession(
         {
             config = await connection.QueryConfigAsync(cancellationToken).ConfigureAwait(false);
         }
-        catch (ControllerCommandException ex)
+        catch (ControllerCommandException ex) when (ex.Result.Outcome != LineOutcome.Discarded)
         {
             warnings.Add($"Controller configuration could not be read: {ex.Message}");
         }
