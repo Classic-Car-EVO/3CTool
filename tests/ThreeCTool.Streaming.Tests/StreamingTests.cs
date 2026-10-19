@@ -364,6 +364,8 @@ public sealed class StreamingTests
 
         Assert.Equal(JobState.Faulted, await streamer.RunAsync().WaitAsync(SimHarness.Timeout));
 
+        // Lines 4-6 are streamed without waiting for acks; the fault can come before the simulator has read them.
+        Assert.True(sim.Simulator.WaitUntil(s => s.ReceivedLines.Contains("G1Z-29F500"), SimHarness.Timeout));
         var received = sim.Simulator.ReceivedLines.Skip(setupLines).ToList();
         Assert.Contains("G1Z-29F500", received);
         Assert.DoesNotContain("G1Z-31", received);
