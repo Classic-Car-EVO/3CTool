@@ -331,7 +331,12 @@ public sealed class JobStreamer : IDisposable
             && (runCancellation.IsCancellationRequested || cancellationToken.IsCancellationRequested || !connection.IsConnected || connection.NeedsResync))
         {
             // Stop, fault or disconnect: the handlers have set the state.
-            if (connection.NeedsResync && State == JobState.Running)
+            if (!connection.IsConnected && State == JobState.Running)
+            {
+                // The connection drops before it raises Disconnected, so a failed write can get here first.
+                OnDisconnected(connection, ex);
+            }
+            else if (connection.NeedsResync && State == JobState.Running)
             {
                 // The connection is marked for resync just before it raises the alarm on the reader thread.
                 await Task.WhenAny(faulted.Task, Task.Delay(AlarmHandlerGrace, CancellationToken.None)).ConfigureAwait(false);
