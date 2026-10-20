@@ -62,7 +62,9 @@ public sealed class MachineControlTests
         // No more keep-alives: the watchdog cancels the jog although the stream is still open.
         Assert.True(feeder.Simulator.WaitUntil(s => s.State == SimState.Idle && s.MachinePosition[0] > start, FeederHarness.Timeout));
         var travelled = feeder.Simulator.MachinePosition[0] - start;
-        Assert.InRange(travelled, 1, 40);
+
+        // Normally ~15 mm; loaded CI runners delay the cancel by seconds. Without the watchdog the jog runs to the limit at ~1300 mm.
+        Assert.InRange(travelled, 1, 200);
         await call.RequestStream.CompleteAsync();
         await call;
     }

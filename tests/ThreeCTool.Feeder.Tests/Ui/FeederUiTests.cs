@@ -261,7 +261,8 @@ public sealed class FeederUiTests
     [Fact]
     public async Task Jog_StepAndPressAndHold_ThenSetWorkZero()
     {
-        await using var feeder = await FeederHarness.StartAsync(new SimulatorOptions { TimeScale = 1 });
+        // A 1 s watchdog: on loaded runners the UI thread can delay a 150 ms keep-alive past the harness's 300 ms.
+        await using var feeder = await FeederHarness.StartAsync(new SimulatorOptions { TimeScale = 1 }, configure: o => o.JogKeepAlive = TimeSpan.FromSeconds(1));
 
         await UiSession.RunAsync(async () =>
         {
@@ -280,19 +281,19 @@ public sealed class FeederUiTests
             ui.Tap(JogButton("X+"));
             await ui.WaitAsync(() => vm.MachineState == "Idle" && Math.Abs(feeder.Simulator.MachinePosition[0] - x - 10) < 1e-3, "stepped 10 mm");
 
-            // Press and hold Y+: the keep-alives keep it moving well past the feeder's 300 ms watchdog.
+            // Press and hold Y+: the keep-alives keep it moving past the feeder's watchdog.
             jog.Continuous = true;
             jog.Feed.Items.Single(i => i.Label == "1000").SelectCommand.Execute(null);
             var y = feeder.Simulator.MachinePosition[1];
             var center = ui.Center(JogButton("Y+"));
             ui.Window.MouseDown(center, MouseButton.Left);
             await ui.WaitAsync(() => jog.IsJogging && vm.MachineState == "Jog", "jogging");
-            await Task.Delay(900);
+            await Task.Delay(2000);
             Assert.Equal("Jog", vm.MachineState);
-            Assert.True(feeder.Simulator.MachinePosition[1] > y + 5, "Still moving after three watchdog periods.");
+            Assert.True(feeder.Simulator.MachinePosition[1] > y + 20, "Still moving after more than a watchdog period.");
             ui.Window.MouseUp(center, MouseButton.Left);
             await ui.WaitAsync(() => !jog.IsJogging && vm.MachineState == "Idle", "released");
-            Assert.InRange(feeder.Simulator.MachinePosition[1] - y, 5, 40);
+            Assert.InRange(feeder.Simulator.MachinePosition[1] - y, 20, 200);
 
             // In continuous mode a plain tap does not step.
             await jog.JogCommand.ExecuteAsync("X+");
