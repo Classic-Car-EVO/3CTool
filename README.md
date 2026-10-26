@@ -15,6 +15,8 @@ It was built for the "3C" mill (X 1300 × Y 750 × Z 600 mm, rotary A axis aroun
 speed dial, FluidNC on a PiBot V5.88 Ultra board), but every machine property lives in an editable machine
 profile that can be imported straight from the controller's FluidNC configuration.
 
+To build the mill yourself watch the videos on Youtube in the Classic Car EVO channel and download the FreeCAD drawings on Printables: https://www.printables.com/model/1891492-classic-car-evo-diy-cnc-mill
+
 > **Safety:** 3C Tool's Stop and Pause buttons are software functions, not safety functions. Always have a
 > hardware emergency stop within reach. Verify every job in the simulator before you run it, and stay at the
 > machine while it is cutting.
